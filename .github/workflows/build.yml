@@ -44,18 +44,17 @@ jobs:
         run: |
           npm install
 
-      - name: Build Application
-        env:
-          GH_TOKEN: ${{ secrets.github_token }}
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            npm run build:win
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            npm run build:mac
-          else
-            npm run build:linux
-          fi
-        shell: bash
+      - name: Build on MacOS
+        if: matrix.os == 'macos-latest'
+        run: npm run build:mac
+
+      - name: Build on Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run build:linux
+
+      - name: Build on Windows
+        if: matrix.os == 'windows-latest'
+        run: npm run build:windows
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
