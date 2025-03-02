@@ -53,7 +53,7 @@ jobs:
 
       - name: Build on MacOS
         if: matrix.os == 'macos-latest'
-        run: npm run build:mac -- --config.mac.identity=null
+        run: npm run build:mac
 
       - name: Build on Linux
         if: matrix.os == 'ubuntu-latest'
