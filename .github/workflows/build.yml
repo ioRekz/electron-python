@@ -42,6 +42,10 @@ jobs:
         run: |
           cd python
           pipenv install --dev
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            pipenv install pywin32-ctypes
+          fi
+        shell: bash
 
       - name: Install Node.js dependencies
         run: |
@@ -58,5 +62,4 @@ jobs:
       - name: Build on Windows
         if: matrix.os == 'windows-latest'
         run: |
-          pip install pywin32-ctypes
           npm run build:win
