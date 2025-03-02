@@ -10,7 +10,7 @@
     "lint": "eslint --cache .",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
-    "build:python": "cd python && .venv/bin/python build.py",
+    "build:python": "cd python && pipenv run python build.py",
     "build": "npm run build:python && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win --publish always",
