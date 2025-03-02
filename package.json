@@ -13,7 +13,7 @@
     "build:python": "cd python && .venv/bin/python build.py",
     "build": "npm run build:python && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
+    "build:win": "npm run build && electron-builder --win --publish always",
     "build:mac": "npm run build && electron-builder --mac --publish always",
     "build:linux": "npm run build && electron-builder --linux --publish always",
     "postinstall": "electron-builder install-app-deps"
