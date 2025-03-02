@@ -19,10 +19,10 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v3
 
-      - name: Install Node.js, NPM and Yarn
-        uses: actions/setup-node@v1
+      - name: Install Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 10
+          node-version: 18
 
       - name: Install Python
         uses: actions/setup-python@v4
@@ -40,8 +40,26 @@ jobs:
           cd python
           PIPENV_VENV_IN_PROJECT=1 pipenv install --dev
 
-      - name: Build/Release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
+      - name: Install Node.js dependencies
+        run: |
+          npm install
+
+      - name: Build Application
+        env:
+          GH_TOKEN: ${{ secrets.github_token }}
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            npm run build:win
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            npm run build:mac
+          else
+            npm run build:linux
+          fi
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         with:
-          github_token: ${{ secrets.github_token }}
-          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          name: ${{ matrix.os }}-artifacts
+          path: |
+            dist
