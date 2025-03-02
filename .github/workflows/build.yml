@@ -36,9 +36,11 @@ jobs:
           pip install pipenv
 
       - name: Install Python dependencies
+        env:
+          PIPENV_VENV_IN_PROJECT: true
         run: |
           cd python
-          PIPENV_VENV_IN_PROJECT=1 pipenv install --dev
+          pipenv install --dev
 
       - name: Install Node.js dependencies
         run: |
@@ -46,6 +48,8 @@ jobs:
 
       - name: Build on MacOS
         if: matrix.os == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:mac -- --config.mac.identity=null
 
       - name: Build on Linux
@@ -58,6 +62,7 @@ jobs:
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
+
         with:
           name: ${{ matrix.os }}-artifacts
           path: |
