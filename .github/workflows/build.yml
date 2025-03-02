@@ -10,6 +10,8 @@ on:
 jobs:
   release:
     runs-on: ${{ matrix.os }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     strategy:
       matrix:
@@ -47,8 +49,6 @@ jobs:
 
       - name: Build on MacOS
         if: matrix.os == 'macos-latest'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:mac -- --config.mac.identity=null
 
       - name: Build on Linux
