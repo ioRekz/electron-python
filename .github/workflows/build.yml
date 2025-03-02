@@ -57,4 +57,6 @@ jobs:
 
       - name: Build on Windows
         if: matrix.os == 'windows-latest'
-        run: npm run build:win
+        run: |
+          pip install pywin32-ctypes
+          npm run build:win
