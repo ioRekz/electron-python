@@ -7,7 +7,6 @@ import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
 import log from 'electron-log'
 import net from 'net'
-import { url } from 'inspector'
 
 // Configure electron-log
 log.transports.file.level = 'info'
