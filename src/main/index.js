@@ -1,4 +1,5 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, protocol, dialog } from 'electron'
+import { net as electronNet } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -6,6 +7,7 @@ import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
 import log from 'electron-log'
 import net from 'net'
+import { url } from 'inspector'
 
 // Configure electron-log
 log.transports.file.level = 'info'
@@ -35,13 +37,17 @@ async function startPythonServer() {
           ? join(__dirname, '../../python/image_classifier.py')
           : join(process.resourcesPath, 'python', 'backend')
 
+        const resourcesPath = is.dev ? join(__dirname, '../../resources') : process.resourcesPath
+
         pythonProcess = is.dev
           ? spawn(join(__dirname, '../../python', '.venv/bin/python'), [
               scriptPath,
               '--port',
-              port.toString()
+              port.toString(),
+              '--resourcesPath',
+              resourcesPath
             ])
-          : spawn(scriptPath, ['--port', port.toString()])
+          : spawn(scriptPath, ['--port', port.toString(), '--resourcesPath', resourcesPath])
 
         log.info(`Starting Python server on port ${port}...`)
 
@@ -108,12 +114,23 @@ function createWindow() {
 
 log.info('Starting Electron app...')
 
+// Add this before app.whenReady()
+function registerLocalFileProtocol() {
+  protocol.handle('local-file', (request) => {
+    const filePath = decodeURI(request.url.replace('local-file://', ''))
+    return electronNet.fetch(`file://${filePath}`)
+  })
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+
+  // Register local-file:// protocol
+  registerLocalFileProtocol()
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -124,6 +141,18 @@ app.whenReady().then(async () => {
 
   // IPC test
   ipcMain.on('ping', () => log.info('pong'))
+
+  // Add image selection handler
+  ipcMain.handle('select-image', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] }]
+    })
+    if (!result.canceled && result.filePaths.length > 0) {
+      return { path: result.filePaths[0], url: `local-file://${result.filePaths[0]}` }
+    }
+    return null
+  })
 
   // Handle text processing
   ipcMain.handle('process-text', async (_, text) => {

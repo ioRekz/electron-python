@@ -12,6 +12,8 @@ extraResources:
   - from: 'resources/python'
     to: 'python'
     filter: ['backend*']
+  - from: 'resources/model'
+    to: 'model'
 asarUnpack:
   - resources/**
 win:
@@ -29,6 +31,7 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+  writeUpdateInfo: false
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:

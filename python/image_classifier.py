@@ -1,11 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
 # from torchvision import models, transforms
-# from PIL import Image
+from PIL import Image
 # import torch
 # import os
 import socket
 import argparse
+from pathlib import Path
+from bear import load_model, predict
 
 
 app = Flask(__name__)
@@ -16,6 +19,8 @@ CORS(app, resources={
         "allow_headers": ["Content-Type"]
     }
 })
+
+
 
 # Load pre-trained ResNet model
 # model = models.resnet50(pretrained=True)
@@ -59,9 +64,50 @@ def hello():
             return jsonify({"error": "No text provided"}), 400
 
         text = data['text']
-        response = f"Hello, {text}"
+        response = f"Hellozzz, {text}"
         return jsonify({"message": response})
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Initialize bear detection model
+MODEL_FILEPATH_WEIGHTS = None
+_bear_model = None
+
+def get_bear_model():
+    global _bear_model
+    if _bear_model is None:
+        _bear_model = load_model(MODEL_FILEPATH_WEIGHTS)
+    return _bear_model
+
+@app.route('/bear', methods=['GET'])
+def detect_bear():
+    try:
+        image_path = request.args.get('path')  # restore query parameter
+        #image_path = "/Users/iorek/dev/bear-detection/data/images/image1.jpg"
+        if not image_path:
+            return jsonify({"error": "No image path provided"}), 400
+
+        path = Path(image_path)
+        if not path.exists():
+            return jsonify({"error": f"Image not found: {image_path}"}), 404
+
+        try:
+            image = Image.open(path)
+            _, prediction_data = predict(model=get_bear_model(), pil_image=image)
+
+            return jsonify({
+                "image_path": str(path),
+                "prediction": prediction_data
+            })
+        except Exception as e:
+            print(e)
+            return jsonify({
+                "image_path": str(path),
+                "error": str(e)
+            }), 500
+
+    except Exception as e:
+        print(e)
         return jsonify({'error': str(e)}), 500
 
 # @app.route('/classify', methods=['POST'])
@@ -113,7 +159,27 @@ def hello():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, required=True, help='Port to run the server on')
+    parser.add_argument('--resourcesPath', type=str, required=True, help='Path to resources with model')
     args = parser.parse_args()
 
-    print(f"Starting server on port: {args.port}")
-    app.run(port=args.port, debug=False)
+    # Add directory listing
+    print(f"\nListing contents of {args.resourcesPath}:")
+    try:
+        for item in os.listdir(args.resourcesPath):
+            item_path = os.path.join(args.resourcesPath, item)
+            if os.path.isdir(item_path):
+                print(f"📁 {item}/")
+                # List contents of subdirectory
+                for subitem in os.listdir(item_path):
+                    print(f"   └─ {subitem}")
+            else:
+                print(f"📄 {item}")
+    except Exception as e:
+        print(f"Error listing directory: {e}")
+
+    MODEL_FILEPATH_WEIGHTS = Path(os.path.join(args.resourcesPath, "model/weights/model.pt"))
+
+    print(f"Loading model from: {MODEL_FILEPATH_WEIGHTS}")
+
+    print(f"Starting server on port: {args.port} with resources path: {args.resourcesPath}")
+    app.run(port=args.port, debug=True)

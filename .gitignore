@@ -6,3 +6,4 @@ out
 *.log*
 python/build/
 resources/python/
+__pycache__/

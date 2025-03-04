@@ -7,6 +7,7 @@ name = "pypi"
 flask = "*"
 pyinstaller = "*"
 flask-cors = "*"
+ultralytics = "*"
 
 [dev-packages]
 

@@ -93,7 +93,8 @@ code {
   padding: 6px;
 }
 
-.action a {
+.action a,
+.action button {
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
@@ -110,7 +111,8 @@ code {
   background-color: var(--ev-button-alt-bg);
 }
 
-.action a:hover {
+.action a:hover,
+.action button:hover {
   border-color: var(--ev-button-alt-hover-border);
   color: var(--ev-button-alt-hover-text);
   background-color: var(--ev-button-alt-hover-bg);

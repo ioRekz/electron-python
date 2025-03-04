@@ -4,7 +4,11 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   getPort: async () => {
-    return await electronAPI.invoke('get-port')
+    return await electronAPI.ipcRenderer.invoke('get-port')
+  },
+  selectImage: async () => {
+    console.log('electronAPI', electronAPI)
+    return await electronAPI.ipcRenderer.invoke('select-image')
   }
 }
 
