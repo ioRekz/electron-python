@@ -117,25 +117,12 @@ log.info('Starting Electron app...')
 // Add this before app.whenReady()
 function registerLocalFileProtocol() {
   protocol.handle('local-file', (request) => {
-    let filePath = decodeURI(request.url.replace('local-file://', ''))
+    log.info('local-file protocol request:', request.url, request.URLSearchParams)
+    const url = new URL(request.url)
+    const filePath = url.searchParams.get('path')
 
-    // Handle Windows paths
-    if (process.platform === 'win32') {
-      // Remove leading slash
-      filePath = filePath.replace(/^\//, '')
+    log.info('Original path:', filePath)
 
-      // If path has a drive letter (e.g., C:, D:)
-      if (/^[a-zA-Z]:/.test(filePath)) {
-        // Convert all forward slashes to backslashes
-        filePath = filePath.replace(/\//g, '\\')
-        // Add raw string visualization
-        log.info('Windows path (raw):', filePath)
-        log.info('Path length:', filePath.length)
-        log.info('Path characters:', [...filePath].join(' '))
-      }
-    }
-
-    log.info('Loading local file:', filePath)
     return electronNet.fetch(`file://${filePath}`)
   })
 }
@@ -172,7 +159,7 @@ app.whenReady().then(async () => {
       const urlPath = filePath.replace(/\\/g, '/')
       return {
         path: filePath,
-        url: `local-file://${urlPath}`
+        url: `local-file://get?path=${urlPath}`
       }
     }
     return null

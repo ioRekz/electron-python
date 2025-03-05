@@ -9,7 +9,7 @@
     "format": "prettier --write .",
     "lint": "eslint --cache .",
     "start": "electron-vite preview",
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev --watch",
     "build:python": "cd python && pipenv run python build.py",
     "build": "npm run build:python && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
