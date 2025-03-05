@@ -93,6 +93,7 @@ function createWindow() {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    mainWindow.webContents.openDevTools()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -120,11 +121,17 @@ function registerLocalFileProtocol() {
 
     // Handle Windows paths
     if (process.platform === 'win32') {
-      // Remove leading slash and convert to proper Windows path
+      // Remove leading slash
       filePath = filePath.replace(/^\//, '')
-      // Handle drive letter
+
+      // If path has a drive letter (e.g., C:, D:)
       if (/^[a-zA-Z]:/.test(filePath)) {
+        // Convert all forward slashes to backslashes
         filePath = filePath.replace(/\//g, '\\')
+        // Add raw string visualization
+        log.info('Windows path (raw):', filePath)
+        log.info('Path length:', filePath.length)
+        log.info('Path characters:', [...filePath].join(' '))
       }
     }
 
