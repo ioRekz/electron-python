@@ -19,8 +19,6 @@ def build_executable():
             '--distpath', output_dir,
             '--workpath', './build',
             '--copy-metadata', 'cloudpathlib',
-            '--hidden-import', 'tensorflow',
-            '--collect-all', 'tensorflow',
             'main.py'
         ])
 
