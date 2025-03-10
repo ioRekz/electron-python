@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-22.04, windows-latest]
+        os: [macos-latest]
 
     steps:
       - name: Check out Git repository
@@ -43,6 +43,7 @@ jobs:
           PIPENV_VENV_IN_PROJECT: true
         run: |
           cd test-species
+          uv venv
           uv pip install pyinstaller
           uv sync
           if [ "$RUNNER_OS" == "Windows" ]; then
