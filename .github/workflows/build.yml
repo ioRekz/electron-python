@@ -44,10 +44,9 @@ jobs:
         run: |
           cd test-species
           uv venv
-          uv pip install pyinstaller
-          uv sync
+          uv sync --group dev
           if [ "$RUNNER_OS" == "Windows" ]; then
-            uv install pywin32-ctypes
+            uv add pywin32-ctypes
           fi
         shell: bash
 

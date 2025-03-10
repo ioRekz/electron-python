@@ -10,7 +10,7 @@
     "lint": "eslint --cache .",
     "start": "electron-vite preview",
     "dev": "electron-vite dev --watch",
-    "build:python": "test-species/.venv/bin/pyinstaller --onefile --name backend --workpath out --distpath resources/python --copy-metadata cloudpathlib test-species/main.py",
+    "build:python": "cd test-species; uv run build.py",
     "build": "npm run build:python && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win --publish always",
