@@ -1,135 +1,166 @@
 import { useState } from 'react'
-import Versions from './components/Versions'
 import electronLogo from './assets/electron.svg'
 
 function App() {
-  const [inputText, setInputText] = useState('')
-  const [result, setResult] = useState('')
-  const [bearResult, setBearResult] = useState(null)
-  const [selectedImage, setSelectedImage] = useState(null)
+  const [predictions, setPredictions] = useState([])
+  const [imageDimensions, setImageDimensions] = useState({})
   const urlParams = new URLSearchParams(window.location.search)
   const port = urlParams.get('port')
 
-  const handleSubmit = async () => {
-    if (!port) return
-
+  const handleClassification = async () => {
     try {
-      const response = await fetch(`http://localhost:${port}/hello`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: inputText })
-      })
+      const result = await window.api.selectFolder()
+      if (!result) return
+
+      const response = await fetch(
+        `http://localhost:${port}/predict?path=${encodeURIComponent(result.path)}`
+      )
       const data = await response.json()
-      setResult(data.message)
+      setPredictions(data.predictions)
     } catch (error) {
       console.error('Error:', error)
-      setResult('Error processing text')
+      setPredictions([])
     }
   }
 
-  const handleBearDetection = async () => {
-    try {
-      const result = await window.api.selectImage()
-      console.log('Selected image:', result)
-      if (!result) return
+  const handleImageLoad = (event, predictionId) => {
+    const img = event.target
+    const rect = img.getBoundingClientRect()
+    setImageDimensions((prev) => ({
+      ...prev,
+      [predictionId]: {
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+        displayWidth: rect.width,
+        displayHeight: rect.height,
+        top: rect.top,
+        left: rect.left
+      }
+    }))
+  }
 
-      console.log('Selected image:', result)
+  const renderBoundingBoxes = (prediction) => {
+    const dims = imageDimensions[prediction.filepath]
+    if (!dims) return null
 
-      // Use the custom protocol URL for display
-      setSelectedImage(result.url)
+    // Calculate the actual image display area within the container
+    const imageAspectRatio = dims.naturalWidth / dims.naturalHeight
+    const containerAspectRatio = dims.displayWidth / dims.displayHeight
 
-      const response = await fetch(
-        `http://localhost:${port}/bear?path=${encodeURIComponent(result.path)}`
-      )
-      const data = await response.json()
-      setBearResult(data)
-    } catch (error) {
-      console.error('Error:', error)
-      setBearResult({ error: 'Error processing image' })
+    let imageDisplayWidth, imageDisplayHeight, offsetX, offsetY
+
+    if (imageAspectRatio > containerAspectRatio) {
+      // Image is wider than container
+      imageDisplayWidth = dims.displayWidth
+      imageDisplayHeight = dims.displayWidth / imageAspectRatio
+      offsetX = 0
+      offsetY = (dims.displayHeight - imageDisplayHeight) / 2
+    } else {
+      // Image is taller than container
+      imageDisplayHeight = dims.displayHeight
+      imageDisplayWidth = dims.displayHeight * imageAspectRatio
+      offsetX = (dims.displayWidth - imageDisplayWidth) / 2
+      offsetY = 0
     }
+
+    return prediction.detections
+      .filter((d) => d.conf > 0.6)
+      .map((detection, index) => {
+        const [x, y, w, h] = detection.bbox
+        return (
+          <div
+            key={index}
+            style={{
+              position: 'absolute',
+              left: `${offsetX + x * imageDisplayWidth}px`,
+              top: `${offsetY + y * imageDisplayHeight}px`,
+              width: `${w * imageDisplayWidth}px`,
+              height: `${h * imageDisplayHeight}px`,
+              border: '2px solid red',
+              pointerEvents: 'none',
+              backgroundColor: 'rgba(255, 0, 0, 0.1)'
+            }}
+          />
+        )
+      })
   }
 
   return (
-    <>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">Python Integration Demo</div>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', width: '100%' }}>
+      <div style={{ padding: '20px' }}>
+        <img alt="logo" className="logo" src={electronLogo} />
+        <div className="creator">Powered by electron-vite</div>
+        <div className="text">Image Classification Demo</div>
 
-      <div className="input-section" style={{ margin: '20px 0' }}>
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="Enter text..."
-          style={{ marginRight: '10px', padding: '5px' }}
-        />
-        <button onClick={handleSubmit} style={{ padding: '5px 10px' }}>
-          Submit
-        </button>
-      </div>
-
-      {result && (
-        <div className="result" style={{ margin: '20px 0' }}>
-          Result: {result}
-        </div>
-      )}
-
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <button onClick={handleBearDetection}>Detect Bears</button>
-        </div>
-      </div>
-
-      {selectedImage && (
-        <div style={{ margin: '20px 0' }}>
-          <div style={{ position: 'relative', width: '400px' }}>
-            <img
-              src={selectedImage}
-              style={{
-                width: '400px',
-                height: 'auto',
-                display: 'block'
-              }}
-              alt="Selected"
-            />
-            {bearResult?.prediction?.boxes &&
-              bearResult.prediction.boxes.map((box, index) => {
-                const { normalized } = box
-                // Calculate absolute positions based on our 400px display width
-                const displayWidth = 400
-                const aspectRatio =
-                  bearResult.prediction.image_size.height / bearResult.prediction.image_size.width
-                const displayHeight = displayWidth * aspectRatio
-
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      position: 'absolute',
-                      left: `${normalized.x1 * displayWidth}px`,
-                      top: `${normalized.y1 * displayHeight}px`,
-                      width: `${(normalized.x2 - normalized.x1) * displayWidth}px`,
-                      height: `${(normalized.y2 - normalized.y1) * displayHeight}px`,
-                      border: '2px solid red',
-                      pointerEvents: 'none',
-                      backgroundColor: 'rgba(255, 0, 0, 0.1)'
-                    }}
-                  />
-                )
-              })}
+        <div className="actions">
+          <div className="action">
+            <button onClick={handleClassification}>Classify Images</button>
           </div>
-          {bearResult?.prediction && <div>Found {bearResult.prediction.boxes.length} bears</div>}
-          {bearResult?.error && <div style={{ color: 'red' }}>Error: {bearResult.error}</div>}
         </div>
-      )}
+      </div>
 
-      <Versions></Versions>
-    </>
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '20px'
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '20px',
+            maxWidth: '100%'
+          }}
+        >
+          {predictions.map((pred, index) => (
+            <div
+              key={index}
+              style={{
+                border: '1px solid #ccc',
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <div
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  paddingBottom: '75%' // 4:3 aspect ratio
+                }}
+              >
+                <img
+                  src={`local-file://get?path=${pred.filepath}`}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain'
+                  }}
+                  alt="Classified"
+                  onLoad={(e) => handleImageLoad(e, pred.filepath)}
+                />
+                {renderBoundingBoxes(pred)}
+              </div>
+              <div style={{ marginTop: '10px' }}>
+                <strong>Prediction:</strong> {pred.prediction.split(';').pop()}
+                <br />
+                <strong>Confidence:</strong> {(pred.prediction_score * 100).toFixed(2)}%
+                <br />
+                <strong>Detections:</strong> {pred.detections.filter((d) => d.conf > 0.6).length}{' '}
+                animals
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* <Versions></Versions> */}
+    </div>
   )
 }
 

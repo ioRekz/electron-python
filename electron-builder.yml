@@ -9,12 +9,13 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!python/*'
+  - '!test-species/*'
 extraResources:
   - from: 'resources/python'
     to: 'python'
     filter: ['backend*']
-  - from: 'resources/model'
-    to: 'model'
+  # - from: 'resources/model'
+  #   to: 'model'
 asarUnpack:
   - resources/**
 win:

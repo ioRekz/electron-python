@@ -33,20 +33,20 @@ async function startPythonServer() {
     findFreePort()
       .then((port) => {
         const scriptPath = is.dev
-          ? join(__dirname, '../../python/image_classifier.py')
+          ? join(__dirname, '../../test-species/main.py')
           : join(process.resourcesPath, 'python', 'backend')
 
-        const resourcesPath = is.dev ? join(__dirname, '../../resources') : process.resourcesPath
+        // const resourcesPath = is.dev ? join(__dirname, '../../resources') : process.resourcesPath
 
         pythonProcess = is.dev
-          ? spawn(join(__dirname, '../../python', '.venv/bin/python'), [
+          ? spawn(join(__dirname, '../../test-species', '.venv/bin/python'), [
               scriptPath,
               '--port',
-              port.toString(),
-              '--resourcesPath',
-              resourcesPath
+              port.toString()
+              // '--resourcesPath',
+              // resourcesPath
             ])
-          : spawn(scriptPath, ['--port', port.toString(), '--resourcesPath', resourcesPath])
+          : spawn(scriptPath, ['--port', port.toString()])
 
         log.info(`Starting Python server on port ${port}...`)
 
@@ -163,6 +163,17 @@ app.whenReady().then(async () => {
       }
     }
     return null
+  })
+
+  // Add folder selection handler
+  ipcMain.handle('select-folder', async () => {
+    const result = dialog.showOpenDialogSync({
+      properties: ['openDirectory']
+    })
+    if (!result) return null
+    return {
+      path: result[0]
+    }
   })
 
   // Handle text processing

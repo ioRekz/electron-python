@@ -5,5 +5,6 @@ out
 .eslintcache
 *.log*
 python/build/
+test-species/build/
 resources/python/
 __pycache__/

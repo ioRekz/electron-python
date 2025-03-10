@@ -9,6 +9,9 @@ const api = {
   selectImage: async () => {
     console.log('electronAPI', electronAPI)
     return await electronAPI.ipcRenderer.invoke('select-image')
+  },
+  selectFolder: async () => {
+    return await electronAPI.ipcRenderer.invoke('select-folder')
   }
 }
 
