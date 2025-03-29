@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-22.04]
     steps:
       - name: Run step when directory changes
         run: echo "This workflow runs only when files in 'my-directory' are modified."
