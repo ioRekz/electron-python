@@ -43,8 +43,8 @@ jobs:
       - name: Install Python dependencies
         shell: bash -l {0}
         run: |
-          conda pip install flask flask-cors
-          conda pip install speciesnet --use-pep517
+          conda run pip install flask flask-cors
+          conda run pip install speciesnet --use-pep517
           conda list
 
       - name: Compress conda environment
