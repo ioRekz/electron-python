@@ -60,12 +60,15 @@ jobs:
             tar -czf dist/species-env-${{ runner.os }}.tar.gz -C $CONDA_BASE/envs species-env
           fi
 
-      - name: Upload environment artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload to Cloudflare R2
+        uses: shallwefootball/s3-upload-action@master
         with:
-          name: conda-env-${{ runner.os }}
-          path: dist/species-env-${{ runner.os }}.*
-          if-no-files-found: error
+          aws_key_id: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          aws_bucket: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
+          endpoint: ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
+          source_dir: dist
+          destination_dir: conda-environments
 
       - name: Install Node.js dependencies
         run: |
@@ -84,5 +87,4 @@ jobs:
 
       - name: Build on Windows
         if: matrix.os == 'windows-latest'
-        run: |
-          npm run build:win
+        run: npm run build:win

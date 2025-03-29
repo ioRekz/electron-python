@@ -117,7 +117,7 @@ async function startPythonServer() {
   let extractPath
   let pythonInterpreter
 
-  if (1 === 1) {
+  if (is.dev) {
     // Extract env.tgz in dev mode
     const speciesZipPath = join(__dirname, '../../clean-species/env.tgz')
     extractPath = getSpeciesExtractPath()
