@@ -62,7 +62,7 @@ jobs:
           fi
 
       - name: Upload environment artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: conda-env-${{ runner.os }}
           path: dist/species-env-${{ runner.os }}.*
