@@ -189,9 +189,14 @@ async function startPythonServer() {
   } else {
     // Production mode
     extractPath = getSpeciesExtractPath()
+
+    // Select URL based on platform
     const envDownloadUrl =
-      'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/species-env-macOS.tar.gz'
-    const downloadedTarPath = join(app.getPath('userData'), 'species-env-macOS.tar.gz')
+      process.platform === 'win32'
+        ? 'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/species-env-Windows.tar.gz'
+        : 'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/species-env-macOS.tar.gz'
+
+    const downloadedTarPath = join(app.getPath('userData'), `species-env.tar.gz`)
 
     scriptPath = join(process.resourcesPath, 'python', 'main.py')
 
