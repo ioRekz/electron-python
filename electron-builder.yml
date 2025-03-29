@@ -11,9 +11,9 @@ files:
   - '!python/*'
   - '!test-species/*'
 extraResources:
-  - from: 'resources/python'
+  - from: 'test-species'
     to: 'python'
-    filter: ['backend*']
+    filter: ['main.py*']
   # - from: 'resources/model'
   #   to: 'model'
 asarUnpack:

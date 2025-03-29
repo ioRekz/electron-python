@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest]
+        os: [windows-latest]
 
     steps:
       - name: Check out Git repository
@@ -54,11 +54,7 @@ jobs:
           CONDA_BASE=$(conda info --base)
           CONDA_ENV_PATH=$CONDA_BASE/envs/species-env
 
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            7z a -tzip dist/species-env-${{ runner.os }}.zip $CONDA_ENV_PATH
-          else
-            tar -czf dist/species-env-${{ runner.os }}.tar.gz -C $CONDA_BASE/envs species-env
-          fi
+          tar -czf dist/species-env-${{ runner.os }}.tar.gz -C $CONDA_BASE/envs species-env
 
       - name: Upload to Cloudflare R2
         uses: shallwefootball/s3-upload-action@master

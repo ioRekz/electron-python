@@ -4,9 +4,19 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { spawn } from 'child_process'
-import { readdirSync, existsSync, mkdirSync, chmodSync, accessSync, constants } from 'fs'
+import {
+  readdirSync,
+  existsSync,
+  mkdirSync,
+  chmodSync,
+  accessSync,
+  constants,
+  createWriteStream
+} from 'fs'
 import log from 'electron-log'
 import net from 'net'
+import path from 'path'
+import { pipeline } from 'stream/promises'
 
 // Configure electron-log
 log.transports.file.level = 'info'
@@ -108,6 +118,36 @@ function makeExecutable(filePath) {
   }
 }
 
+async function downloadFile(url, destination) {
+  log.info(`Downloading ${url} to ${destination}...`)
+
+  try {
+    // Ensure the directory exists
+    const dir = path.dirname(destination)
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true })
+    }
+
+    // Create a write stream
+    const writer = createWriteStream(destination)
+
+    // Download the file with electron's net module
+    const response = await electronNet.fetch(url)
+    if (!response.ok) {
+      throw new Error(`Download failed with status ${response.status}`)
+    }
+
+    // Pipe the response to the file
+    await pipeline(response.body, writer)
+
+    log.info(`Download complete: ${destination}`)
+    return destination
+  } catch (error) {
+    log.error(`Download failed: ${error.message}`)
+    throw error
+  }
+}
+
 async function startPythonServer() {
   log.info('Finding free port for Python server...')
   serverPort = await findFreePort()
@@ -147,9 +187,64 @@ async function startPythonServer() {
       log.info(`Falling back to: ${scriptPath} with system Python`)
     }
   } else {
-    scriptPath = join(process.resourcesPath, 'python', 'backend')
-    if (!isExecutable(scriptPath)) {
-      makeExecutable(scriptPath)
+    // Production mode
+    extractPath = getSpeciesExtractPath()
+    const envDownloadUrl =
+      'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/species-env-macOS.tar.gz'
+    const downloadedTarPath = join(app.getPath('userData'), 'species-env-macOS.tar.gz')
+
+    scriptPath = join(process.resourcesPath, 'python', 'main.py')
+
+    try {
+      // Check if we already have files extracted
+      if (existsSync(extractPath)) {
+        const files = readdirSync(extractPath)
+        if (files.length > 0 && files.includes('species-env')) {
+          log.info('Environment already extracted, using existing files')
+        } else {
+          // Download and extract the environment
+          log.info('Downloading environment file...')
+          await downloadFile(envDownloadUrl, downloadedTarPath)
+          log.info('Extracting downloaded environment...')
+          await extractTarGz(downloadedTarPath, extractPath)
+        }
+      } else {
+        // Download and extract the environment
+        log.info('Downloading environment file...')
+        await downloadFile(envDownloadUrl, downloadedTarPath)
+        log.info('Extracting downloaded environment...')
+        await extractTarGz(downloadedTarPath, extractPath)
+      }
+
+      // Use the extracted Python environment
+      pythonInterpreter = join(extractPath, 'species-env/bin/python3.11')
+
+      // Check if executable and make it executable if needed
+      if (!isExecutable(pythonInterpreter)) {
+        log.warn(`Python interpreter not executable: ${pythonInterpreter}`)
+        if (!makeExecutable(pythonInterpreter)) {
+          log.warn('Could not make Python interpreter executable, falling back to bundled backend')
+          // scriptPath = join(__dirname, '../../test-species', 'main.py')
+          if (!isExecutable(scriptPath)) {
+            makeExecutable(scriptPath)
+          }
+        } else {
+          // Python interpreter is now executable, use backend script from resources
+          // scriptPath = join(__dirname, '../../test-species', 'main.py')
+        }
+      } else {
+        // Python interpreter is executable, use main.py from resources
+        // scriptPath = join(__dirname, '../../test-species', 'main.py')
+        log.info(`Using Python interpreter: ${pythonInterpreter} with script: ${scriptPath}`)
+      }
+    } catch (error) {
+      log.error('Failed to download or extract environment:', error)
+      // Fallback to bundled executable
+      scriptPath = join(process.resourcesPath, 'python', 'backend')
+      if (!isExecutable(scriptPath)) {
+        makeExecutable(scriptPath)
+      }
+      log.info(`Falling back to bundled backend: ${scriptPath}`)
     }
   }
 
@@ -158,7 +253,11 @@ async function startPythonServer() {
 
     if (is.dev) {
       pythonProcess = spawn(pythonInterpreter, [scriptPath, '--port', serverPort.toString()])
+    } else if (pythonInterpreter && existsSync(pythonInterpreter)) {
+      // If we have a valid Python interpreter, use it
+      pythonProcess = spawn(pythonInterpreter, [scriptPath, '--port', serverPort.toString()])
     } else {
+      // Otherwise fall back to bundled executable
       pythonProcess = spawn(scriptPath, ['--port', serverPort.toString()])
     }
 
