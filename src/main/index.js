@@ -165,6 +165,7 @@ async function startPythonServer() {
     try {
       await extractTarGz(speciesZipPath, extractPath)
       scriptPath = join(__dirname, '../../test-species/main.py')
+
       pythonInterpreter = join(extractPath, 'env/bin/python3.11')
 
       // Check if Python interpreter is executable
@@ -222,7 +223,10 @@ async function startPythonServer() {
       }
 
       // Use the extracted Python environment
-      pythonInterpreter = join(extractPath, 'species-env/bin/python3.11')
+      pythonInterpreter =
+        process.platform === 'win32'
+          ? join(extractPath, 'species-env/python.exe')
+          : join(extractPath, 'species-env/bin/python3.11')
 
       // Check if executable and make it executable if needed
       if (!isExecutable(pythonInterpreter)) {
