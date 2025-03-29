@@ -4,7 +4,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { spawn } from 'child_process'
-import { readdirSync } from 'fs'
+import { readdirSync, existsSync, mkdirSync, chmodSync, accessSync, constants } from 'fs'
 import log from 'electron-log'
 import net from 'net'
 
@@ -27,54 +27,187 @@ function findFreePort() {
   })
 }
 
-async function startPythonServer() {
-  log.info('Starting Python server...')
+function getSpeciesExtractPath() {
+  return join(app.getPath('userData'), 'species-data')
+}
+
+async function extractTarGz(tarPath, extractPath) {
+  // Check if extraction directory already exists and contains files
+  log.info(`Checking extraction directory at ${extractPath}`, existsSync(extractPath))
+  if (existsSync(extractPath)) {
+    try {
+      const files = readdirSync(extractPath)
+      if (files.length > 0 && files.includes('env')) {
+        log.info(
+          `Extraction directory already exists with content at ${extractPath}, skipping extraction`
+        )
+        return extractPath
+      }
+    } catch (error) {
+      log.warn(`Error checking extraction directory: ${error}`)
+    }
+  }
+
+  log.info(`Extracting ${tarPath} to ${extractPath}`)
+
+  if (!existsSync(extractPath)) {
+    mkdirSync(extractPath, { recursive: true })
+  }
+
   return new Promise((resolve, reject) => {
-    findFreePort()
-      .then((port) => {
-        const scriptPath = is.dev
-          ? join(__dirname, '../../test-species/main.py')
-          : join(process.resourcesPath, 'python', 'backend')
+    const startTime = Date.now()
 
-        // const resourcesPath = is.dev ? join(__dirname, '../../resources') : process.resourcesPath
+    // Use native tar command - works on macOS, Linux, and modern Windows
+    const tarProcess = spawn('tar', ['-xzf', tarPath, '-C', extractPath])
 
-        pythonProcess = is.dev
-          ? spawn(join(__dirname, '../../test-species', '.venv/bin/python'), [
-              scriptPath,
-              '--port',
-              port.toString()
-              // '--resourcesPath',
-              // resourcesPath
-            ])
-          : spawn(scriptPath, ['--port', port.toString()])
+    tarProcess.stdout.on('data', (data) => {
+      log.info(`tar output: ${data}`)
+    })
 
-        log.info(`Starting Python server on port ${port}...`)
+    tarProcess.stderr.on('data', (data) => {
+      // Not necessarily an error, tar outputs progress to stderr
+      log.info(`tar progress: ${data}`)
+    })
 
-        pythonProcess.stdout.on('data', (data) => {
-          const output = data.toString()
-          log.info('Python output:', output)
-        })
+    tarProcess.on('error', (err) => {
+      log.error(`Error executing tar command:`, err)
+      reject(err)
+    })
 
-        //python/flask sends everything to stderr
-        pythonProcess.stderr.on('data', (data) => {
-          log.error(`Python output: ${data}`)
-        })
-
-        pythonProcess.on('error', (err) => {
-          log.error('Failed to start Python server:', err)
-          reject(err)
-        })
-
-        // Wait a bit to ensure the server is ready
-        setTimeout(() => {
-          serverPort = port
-          resolve(port)
-        }, 1000)
-      })
-      .catch((err) => {
+    tarProcess.on('close', (code) => {
+      const duration = (Date.now() - startTime) / 1000
+      if (code === 0) {
+        log.info(`Extraction complete to ${extractPath}. Took ${duration} seconds.`)
+        resolve(extractPath)
+      } else {
+        const err = new Error(`tar process exited with code ${code}`)
+        log.error(err)
         reject(err)
-      })
+      }
+    })
   })
+}
+
+function isExecutable(filePath) {
+  try {
+    accessSync(filePath, constants.X_OK)
+    return true
+  } catch (err) {
+    return false
+  }
+}
+
+function makeExecutable(filePath) {
+  try {
+    log.info(`Making ${filePath} executable...`)
+    chmodSync(filePath, 0o755) // rwx r-x r-x
+    return true
+  } catch (err) {
+    log.error(`Failed to make file executable: ${err}`)
+    return false
+  }
+}
+
+async function startPythonServer() {
+  log.info('Finding free port for Python server...')
+  serverPort = await findFreePort()
+  log.info(`Free port found: ${serverPort}`)
+
+  let scriptPath
+  let extractPath
+  let pythonInterpreter
+
+  if (1 === 1) {
+    // Extract env.tgz in dev mode
+    const speciesZipPath = join(__dirname, '../../clean-species/env.tgz')
+    extractPath = getSpeciesExtractPath()
+
+    try {
+      await extractTarGz(speciesZipPath, extractPath)
+      scriptPath = join(__dirname, '../../test-species/main.py')
+      pythonInterpreter = join(extractPath, 'env/bin/python3.11')
+
+      // Check if Python interpreter is executable
+      if (!isExecutable(pythonInterpreter)) {
+        log.warn(`Python interpreter not executable: ${pythonInterpreter}`)
+        if (!makeExecutable(pythonInterpreter)) {
+          // Fall back to system Python if we can't make it executable
+          log.warn('Falling back to system Python')
+          pythonInterpreter = 'python3'
+        }
+      }
+
+      log.info(`Using extracted main.py at: ${scriptPath}`)
+      log.info(`Using Python interpreter: ${pythonInterpreter}`)
+    } catch (error) {
+      log.error('Failed to extract env.tgz:', error)
+      // Fallback to original script path and system Python
+      scriptPath = join(__dirname, '../../clean-species/main.py')
+      pythonInterpreter = 'python3'
+      log.info(`Falling back to: ${scriptPath} with system Python`)
+    }
+  } else {
+    scriptPath = join(process.resourcesPath, 'python', 'backend')
+    if (!isExecutable(scriptPath)) {
+      makeExecutable(scriptPath)
+    }
+  }
+
+  try {
+    log.info(`Starting Python server on port ${serverPort}...`)
+
+    if (is.dev) {
+      pythonProcess = spawn(pythonInterpreter, [scriptPath, '--port', serverPort.toString()])
+    } else {
+      pythonProcess = spawn(scriptPath, ['--port', serverPort.toString()])
+    }
+
+    pythonProcess.stdout.on('data', (data) => {
+      const output = data.toString()
+      log.info('Python output:', output)
+    })
+
+    //python/flask sends everything to stderr
+    pythonProcess.stderr.on('data', (data) => {
+      log.error(`Python output: ${data}`)
+    })
+
+    pythonProcess.on('error', (err) => {
+      log.error('Failed to start Python server:', err)
+      throw err // Re-throw to be caught by the outer try-catch
+    })
+
+    // Wait a bit to ensure the server is ready
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+  } catch (error) {
+    log.error('Error in Python process startup:', error)
+
+    // Last resort: try with system Python
+    if (is.dev && pythonInterpreter !== 'python3') {
+      log.info('Attempting to start with system Python as last resort...')
+      pythonProcess = spawn('python3', [scriptPath, '--port', serverPort.toString()])
+
+      // Set up event handlers again
+      pythonProcess.stdout.on('data', (data) => {
+        const output = data.toString()
+        log.info('Python output (fallback):', output)
+      })
+
+      pythonProcess.stderr.on('data', (data) => {
+        log.error(`Python output (fallback): ${data}`)
+      })
+
+      pythonProcess.on('error', (err) => {
+        log.error('Failed to start Python server with fallback:', err)
+        throw new Error('Could not start Python server with any method')
+      })
+
+      // Wait again
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+    } else {
+      throw error // Re-throw if we've exhausted our options
+    }
+  }
 }
 
 function createWindow() {

@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-22.04]
+        os: [macos-latest]
 
     steps:
       - name: Check out Git repository
@@ -33,22 +33,40 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install uv
-        run: |
-          python -m pip install --upgrade pip
-          pip install uv
+      - name: Install Miniforge
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          activate-environment: species-env
+          use-mamba: true
 
       - name: Install Python dependencies
-        env:
-          PIPENV_VENV_IN_PROJECT: true
+        shell: bash -l {0}
         run: |
-          cd test-species
-          uv venv
-          uv sync --group dev
+          mamba pip install flask flask-cors
+          mamba pip install speciesnet --use-pep517
+          mamba list
+
+      - name: Compress conda environment
+        shell: bash -l {0}
+        run: |
+          mkdir -p dist
+          CONDA_BASE=$(conda info --base)
+          CONDA_ENV_PATH=$CONDA_BASE/envs/species-env
+
           if [ "$RUNNER_OS" == "Windows" ]; then
-            uv add pywin32-ctypes
+            7z a -tzip dist/species-env-${{ runner.os }}.zip $CONDA_ENV_PATH
+          else
+            tar -czf dist/species-env-${{ runner.os }}.tar.gz -C $CONDA_BASE/envs species-env
           fi
-        shell: bash
+
+      - name: Upload environment artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: conda-env-${{ runner.os }}
+          path: dist/species-env-${{ runner.os }}.*
+          if-no-files-found: error
 
       - name: Install Node.js dependencies
         run: |
