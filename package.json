@@ -11,7 +11,7 @@
     "start": "electron-vite preview",
     "dev": "electron-vite dev --watch",
     "build:python": "cd test-species && uv run build.py",
-    "build": "npm run build:python && electron-vite build",
+    "build": "electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win --publish always",
     "build:mac": "npm run build && electron-builder --mac --publish always",
