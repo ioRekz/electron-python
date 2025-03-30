@@ -102,7 +102,7 @@ function isExecutable(filePath) {
   try {
     accessSync(filePath, constants.X_OK)
     return true
-  } catch (err) {
+  } catch {
     return false
   }
 }
