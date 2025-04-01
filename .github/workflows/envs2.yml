@@ -1,4 +1,4 @@
-name: Python/Envs
+name: Python/Poetry/Envs
 
 on:
   push:
