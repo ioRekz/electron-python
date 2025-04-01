@@ -41,7 +41,8 @@ jobs:
       - name: Compress env
         run: |
           cd poet
-          tar -czf poet.tar.gz .venv
+          mkdir -p dist
+          tar -czf dist/poet.tar.gz .venv
           pwd
           ls -l
 
@@ -52,5 +53,5 @@ jobs:
           aws_secret_access_key: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
           aws_bucket: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
           endpoint: ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
-          source_dir: poet
+          source_dir: poet/dist
           destination_dir: poetry-environments
