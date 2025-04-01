@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'poet/**'
+      - '.github/workflows/envs2.yml'
 
 jobs:
   upload_env:
@@ -40,6 +41,7 @@ jobs:
       - name: Compress env
         run: |
           cd poet
+          mkdir -p dist
           tar -czf dist/poet.tar.gz .venv
 
       - name: Upload to Cloudflare R2
