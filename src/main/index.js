@@ -37,10 +37,6 @@ function findFreePort() {
   })
 }
 
-function getSpeciesExtractPath() {
-  return join(app.getPath('userData'), 'species-data')
-}
-
 async function extractTarGz(tarPath, extractPath) {
   // Check if extraction directory already exists and contains files
   log.info(`Checking extraction directory at ${extractPath}`, existsSync(extractPath))
@@ -150,55 +146,27 @@ async function downloadFile(url, destination) {
 
 async function startPythonServer() {
   log.info('Finding free port for Python server...')
-  serverPort = await findFreePort()
+  serverPort = is.dev ? 5002 : await findFreePort()
   log.info(`Free port found: ${serverPort}`)
 
   let scriptPath
-  let extractPath
   let pythonInterpreter
 
   if (is.dev) {
-    // Extract env.tgz in dev mode
-    const speciesZipPath = join(__dirname, '../../clean-species/env.tgz')
-    extractPath = getSpeciesExtractPath()
+    scriptPath = join(__dirname, '../../test-species/main.py')
+    pythonInterpreter = join(__dirname, '../../test-species/.venv/bin/python3.11')
 
-    try {
-      await extractTarGz(speciesZipPath, extractPath)
-      scriptPath = join(__dirname, '../../test-species/main.py')
-
-      pythonInterpreter = join(extractPath, 'env/bin/python3.11')
-
-      // Check if Python interpreter is executable
-      if (!isExecutable(pythonInterpreter)) {
-        log.warn(`Python interpreter not executable: ${pythonInterpreter}`)
-        if (!makeExecutable(pythonInterpreter)) {
-          // Fall back to system Python if we can't make it executable
-          log.warn('Falling back to system Python')
-          pythonInterpreter = 'python3'
-        }
-      }
-
-      log.info(`Using extracted main.py at: ${scriptPath}`)
-      log.info(`Using Python interpreter: ${pythonInterpreter}`)
-    } catch (error) {
-      log.error('Failed to extract env.tgz:', error)
-      // Fallback to original script path and system Python
-      scriptPath = join(__dirname, '../../clean-species/main.py')
-      pythonInterpreter = 'python3'
-      log.info(`Falling back to: ${scriptPath} with system Python`)
-    }
+    log.info(`Using extracted main.py at: ${scriptPath}`)
+    log.info(`Using Python interpreter: ${pythonInterpreter}`)
   } else {
     // Production mode
-    extractPath = getSpeciesExtractPath()
+    const extractPath = join(app.getPath('userData'), 'species-data')
 
-    // Select URL based on platform
-    const envDownloadUrl =
-      process.platform === 'win32'
-        ? 'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/species-env-Windows.tar.gz'
-        : process.platform === 'linux'
-          ? 'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/species-env-Linux.tar.gz'
-          : 'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/species-env-macOS.tar.gz'
+    const baseURL = 'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/'
+    const osName =
+      process.platform === 'win32' ? 'Windows' : process.platform === 'linux' ? 'Linux' : 'macOS'
 
+    const envDownloadUrl = `${baseURL}species-env-${osName}.tar.gz`
     const downloadedTarPath = join(app.getPath('userData'), `species-env.tar.gz`)
 
     scriptPath = join(process.resourcesPath, 'python', 'main.py')
@@ -235,27 +203,13 @@ async function startPythonServer() {
         log.warn(`Python interpreter not executable: ${pythonInterpreter}`)
         if (!makeExecutable(pythonInterpreter)) {
           log.warn('Could not make Python interpreter executable, falling back to bundled backend')
-          // scriptPath = join(__dirname, '../../test-species', 'main.py')
           if (!isExecutable(scriptPath)) {
             makeExecutable(scriptPath)
           }
-        } else {
-          // Python interpreter is now executable, use backend script from resources
-          // scriptPath = join(__dirname, '../../test-species', 'main.py')
         }
-      } else {
-        // Python interpreter is executable, use main.py from resources
-        // scriptPath = join(__dirname, '../../test-species', 'main.py')
-        log.info(`Using Python interpreter: ${pythonInterpreter} with script: ${scriptPath}`)
       }
     } catch (error) {
       log.error('Failed to download or extract environment:', error)
-      // Fallback to bundled executable
-      scriptPath = join(process.resourcesPath, 'python', 'backend')
-      if (!isExecutable(scriptPath)) {
-        makeExecutable(scriptPath)
-      }
-      log.info(`Falling back to bundled backend: ${scriptPath}`)
     }
   }
 
@@ -268,8 +222,7 @@ async function startPythonServer() {
       // If we have a valid Python interpreter, use it
       pythonProcess = spawn(pythonInterpreter, [scriptPath, '--port', serverPort.toString()])
     } else {
-      // Otherwise fall back to bundled executable
-      pythonProcess = spawn(scriptPath, ['--port', serverPort.toString()])
+      log.error('Python interpreter not found or not executable:', pythonInterpreter)
     }
 
     pythonProcess.stdout.on('data', (data) => {
@@ -279,7 +232,7 @@ async function startPythonServer() {
 
     //python/flask sends everything to stderr
     pythonProcess.stderr.on('data', (data) => {
-      log.error(`Python output: ${data}`)
+      log.info(`Python output: ${data}`)
     })
 
     pythonProcess.on('error', (err) => {
@@ -323,8 +276,8 @@ async function startPythonServer() {
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1300,
+    height: 800,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -419,74 +372,6 @@ app.whenReady().then(async () => {
     }
   })
 
-  // Handle text processing
-  ipcMain.handle('process-text', async (_, text) => {
-    return new Promise((resolve, reject) => {
-      const isProduction = !is.dev
-      let executablePath
-
-      // Add detailed logging
-      log.info('Environment:', isProduction ? 'Production' : 'Development')
-      log.info('process.resourcesPath:', process.resourcesPath)
-
-      if (isProduction) {
-        try {
-          // Log contents of resources directory
-          const resourcesContent = readdirSync(process.resourcesPath)
-          log.info('Contents of resources directory:', resourcesContent)
-
-          // Log contents of python directory if it exists
-          const pythonPath = join(process.resourcesPath, 'python')
-          try {
-            const pythonContent = readdirSync(pythonPath)
-            log.info('Contents of python directory:', pythonContent)
-          } catch (err) {
-            log.error('Error reading python directory:', err)
-          }
-        } catch (err) {
-          log.error('Error reading resources directory:', err)
-        }
-
-        executablePath = join(
-          process.resourcesPath,
-          'python',
-          process.platform === 'win32' ? 'text_processor.exe' : 'text_processor'
-        )
-      } else {
-        executablePath = join(__dirname, '../../python', 'check.py')
-      }
-
-      log.info('Final executablePath:', executablePath)
-
-      const childProcess = isProduction
-        ? spawn(executablePath, [text])
-        : spawn(join(__dirname, '../../python', '.venv/bin/python'), [executablePath, text])
-
-      let result = ''
-
-      childProcess.stdout.on('data', (data) => {
-        result += data.toString()
-      })
-
-      childProcess.stderr.on('data', (data) => {
-        log.error(`Python Process Error: ${data}`)
-      })
-
-      childProcess.on('error', (err) => {
-        log.error('Failed to start Python process:', err)
-        reject(err)
-      })
-
-      childProcess.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`Process exited with code ${code}`))
-        } else {
-          resolve(result.trim())
-        }
-      })
-    })
-  })
-
   try {
     await startPythonServer()
     createWindow()
@@ -499,6 +384,14 @@ app.whenReady().then(async () => {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+
+  app.on('before-quit', () => {
+    log.info('Quitting app....')
+    if (pythonProcess) {
+      pythonProcess.kill()
+      pythonProcess = null
+    }
   })
 })
 

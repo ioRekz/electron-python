@@ -90,7 +90,7 @@ function App() {
       <div style={{ padding: '20px' }}>
         <img alt="logo" className="logo" src={electronLogo} />
         <div className="creator">Powered by electron-vite</div>
-        <div className="text">Image Classification Demo</div>
+        <div className="text-red-400 text-2xl">Image Classification Demo</div>
 
         <div className="actions">
           <div className="action">

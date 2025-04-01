@@ -31,6 +31,10 @@ def get_model():
                 )
     return _model
 
+@app.route('/', methods=['GET'])
+def health_check():
+  return jsonify({"status": "healthy"}), 200
+
 @app.route('/predict', methods=['GET'])
 def detect_bear():
     try:
