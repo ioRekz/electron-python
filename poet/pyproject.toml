@@ -1,7 +1,7 @@
 [project]
 name = "poet-test"
 version = "0.1.0"
-description = "hello"
+description = "Python backend for electron"
 authors = [
     {name = "Jeremy Vuillermet",email = "jeremy.vuillermet@gmail.com"}
 ]
