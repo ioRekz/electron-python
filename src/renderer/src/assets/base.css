@@ -31,14 +31,6 @@
   --color-text: var(--ev-c-text-1);
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  font-weight: normal;
-}
-
 ul {
   list-style: none;
 }
@@ -46,7 +38,7 @@ ul {
 body {
   min-height: 100vh;
   color: var(--color-text);
-  background: var(--color-background);
+  background: rgba(250, 250, 250);
   line-height: 1.6;
   font-family:
     Inter,

@@ -1,15 +1,5 @@
-@import './base.css';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
 @import 'tailwindcss';
-
-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background-image: url('./wavy-lines.svg');
-  background-size: cover;
-  user-select: none;
-}
 
 code {
   font-weight: 600;
@@ -27,13 +17,16 @@ code {
   font-size: 85%;
 }
 
-#root {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  margin-bottom: 80px;
-  width: 100vw;
+@layer base {
+  :root {
+    --font-sans: 'Inter', sans-serif;
+    --default-font-family: 'Inter', sans-serif;
+    --sidebar-foreground: 240 5.3% 26.1%;
+  }
+}
+
+body {
+  background-color: rgb(250, 250, 250);
 }
 
 .logo {
