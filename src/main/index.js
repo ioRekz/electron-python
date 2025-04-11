@@ -8,15 +8,19 @@ import {
   readdirSync,
   existsSync,
   mkdirSync,
+  unlinkSync,
   chmodSync,
   accessSync,
   constants,
-  createWriteStream
+  createWriteStream,
+  statSync
 } from 'fs'
 import log from 'electron-log'
 import net from 'net'
 import path from 'path'
 import { pipeline } from 'stream/promises'
+import { importCamTrapDataset } from './camtrap'
+import { getSpeciesDistribution, getDeployments, getDeploymentsActivity } from './queries'
 
 // Configure electron-log
 log.transports.file.level = 'info'
@@ -297,6 +301,12 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  // Setup drag and drop event handlers
+  mainWindow.webContents.on('will-navigate', (event) => {
+    // Prevent navigation when dropping files
+    event.preventDefault()
+  })
+
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -367,13 +377,151 @@ app.whenReady().then(async () => {
       properties: ['openDirectory']
     })
     if (!result) return null
+    // if (!pythonProcess) {
+    //   startPythonServer()
+    // }
+    const path = result[0]
+    const id = crypto.randomUUID()
+    const { data } = await importCamTrapDataset(path, id)
+
     return {
-      path: result[0]
+      path,
+      data,
+      id
+    }
+  })
+
+  // Add species distribution handler
+  ipcMain.handle('get-species-distribution', async (_, studyId) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const distribution = await getSpeciesDistribution(dbPath)
+      return { data: distribution }
+    } catch (error) {
+      log.error('Error getting species distribution:', error)
+      return { error: error.message }
+    }
+  })
+
+  // Add deployments handler
+  ipcMain.handle('get-deployments', async (_, studyId) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const deployments = await getDeployments(dbPath)
+      return { data: deployments }
+    } catch (error) {
+      log.error('Error getting deployments:', error)
+      return { error: error.message }
+    }
+  })
+
+  ipcMain.handle('get-deployments-activity', async (_, studyId) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const activity = await getDeploymentsActivity(dbPath)
+      return { data: activity }
+    } catch (error) {
+      log.error('Error getting deployments activity:', error)
+      return { error: error.message }
+    }
+  })
+  // Add drag and drop handler
+  ipcMain.handle('import-dropped-directory', async (_, directoryPath) => {
+    try {
+      log.info(`Processing dropped directory: ${directoryPath}`)
+
+      // Validate that the path exists and is a directory
+      if (!existsSync(directoryPath) || !statSync(directoryPath).isDirectory()) {
+        log.warn(`Invalid directory path: ${directoryPath}`)
+        return { error: 'The dropped item is not a valid directory' }
+      }
+
+      const id = crypto.randomUUID()
+      const { data } = await importCamTrapDataset(directoryPath, id)
+
+      return {
+        path: directoryPath,
+        data,
+        id
+      }
+    } catch (error) {
+      log.error('Error processing dropped directory:', error)
+      return { error: error.message }
+    }
+  })
+
+  // Add handler for showing study context menu
+  ipcMain.handle('show-study-context-menu', (event, studyId) => {
+    const { Menu } = require('electron')
+    const targetWindow = BrowserWindow.fromWebContents(event.sender)
+
+    const menu = Menu.buildFromTemplate([
+      {
+        label: 'Delete study',
+        click: () => {
+          try {
+            log.info(`Deleting database for study: ${studyId}`)
+            const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+            event.sender.send('delete-study', studyId)
+
+            if (existsSync(dbPath)) {
+              unlinkSync(dbPath)
+              log.info(`Successfully deleted database: ${dbPath}`)
+              return { success: true }
+            } else {
+              log.warn(`Database not found for deletion: ${dbPath}`)
+              return { success: true, message: 'Database already deleted or not found' }
+            }
+          } catch (error) {
+            log.error('Error deleting study database:', error)
+            return { error: error.message, success: false }
+          }
+        }
+      }
+    ])
+
+    menu.popup({ window: targetWindow })
+    return true
+  })
+
+  // Add handler for deleting study database
+  ipcMain.handle('delete-study-database', async (_, studyId) => {
+    try {
+      log.info(`Deleting database for study: ${studyId}`)
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+
+      if (existsSync(dbPath)) {
+        fs.unlinkSync(dbPath)
+        log.info(`Successfully deleted database: ${dbPath}`)
+        return { success: true }
+      } else {
+        log.warn(`Database not found for deletion: ${dbPath}`)
+        return { success: true, message: 'Database already deleted or not found' }
+      }
+    } catch (error) {
+      log.error('Error deleting study database:', error)
+      return { error: error.message, success: false }
     }
   })
 
   try {
-    await startPythonServer()
+    // await startPythonServer()
+
     createWindow()
   } catch (error) {
     log.error('Failed to start Python server:', error)
@@ -392,6 +540,16 @@ app.whenReady().then(async () => {
       pythonProcess.kill()
       pythonProcess = null
     }
+  })
+
+  // Add model status check handler
+  ipcMain.handle('check-model-status', () => {
+    return checkModelStatus()
+  })
+
+  // Add model download handler
+  ipcMain.handle('download-model', async () => {
+    return await downloadModel()
   })
 })
 
@@ -413,3 +571,65 @@ app.on('window-all-closed', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
+
+function checkModelStatus() {
+  // if (is.dev) {
+  //   // In dev mode, assume model is available through the Python environment
+  //   return { isDownloaded: true }
+  // }
+
+  const extractPath = join(app.getPath('userData'), 'species-data')
+  const envPath = join(extractPath, 'species-env')
+
+  // Check if environment exists and has content
+  if (existsSync(envPath)) {
+    try {
+      const stats = statSync(envPath)
+      return {
+        isDownloaded: stats.isDirectory(),
+        size: stats.size,
+        lastModified: stats.mtime
+      }
+    } catch (error) {
+      log.warn(`Error checking model status: ${error}`)
+    }
+  }
+
+  return { isDownloaded: false }
+}
+
+async function downloadModel() {
+  // if (is.dev) {
+  //   // In dev mode, just return success
+  //   return { success: true, message: "Model already available in dev mode" }
+  // }
+
+  try {
+    const extractPath = join(app.getPath('userData'), 'species-data')
+    const baseURL = 'https://pub-5a51774bae6b4020a4948aaf91b72172.r2.dev/conda-environments/'
+    const osName =
+      process.platform === 'win32' ? 'Windows' : process.platform === 'linux' ? 'Linux' : 'macOS'
+
+    const envDownloadUrl = `${baseURL}species-env-${osName}.tar.gz`
+    const downloadedTarPath = join(app.getPath('userData'), `species-env.tar.gz`)
+
+    // Download the environment
+    log.info('Downloading environment file...')
+    await downloadFile(envDownloadUrl, downloadedTarPath)
+
+    // Extract the environment
+    log.info('Extracting downloaded environment...')
+    await extractTarGz(downloadedTarPath, extractPath)
+
+    return {
+      success: true,
+      message: 'Model downloaded and extracted successfully'
+    }
+  } catch (error) {
+    log.error('Failed to download model:', error)
+    return {
+      success: false,
+      message: `Failed to download model: ${error.message}`
+    }
+  }
+}

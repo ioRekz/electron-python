@@ -1,12 +1,64 @@
-import { Camera, ChartBar, ImageIcon } from 'lucide-react'
-import { useState } from 'react'
+import { Camera, ChartBar, ImageIcon, Download, CheckCircle, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 function App() {
   const [predictions, setPredictions] = useState([])
+  const [modelStatus, setModelStatus] = useState({ isChecking: true, isDownloaded: false })
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
   const urlParams = new URLSearchParams(window.location.search)
-  const port = urlParams.get('port')
+  const port = urlParams.get('port') === 'null' ? 5002 : urlParams.get('port')
+
+  // Check model status on component mount
+  useEffect(() => {
+    async function checkModel() {
+      try {
+        const status = await window.api.checkModelStatus()
+        setModelStatus({ isChecking: false, ...status })
+      } catch (error) {
+        console.error('Error checking model status:', error)
+        setModelStatus({ isChecking: false, isDownloaded: false, error: error.message })
+      }
+    }
+
+    checkModel()
+  }, [])
+
+  const handleModelDownload = async () => {
+    if (isDownloading || modelStatus.isDownloaded) return
+
+    setIsDownloading(true)
+    try {
+      const result = await window.api.downloadModel()
+      if (result.success) {
+        setModelStatus({ isChecking: false, isDownloaded: true })
+      } else {
+        setModelStatus({
+          isChecking: false,
+          isDownloaded: false,
+          error: result.message
+        })
+      }
+    } catch (error) {
+      console.error('Error downloading model:', error)
+      setModelStatus({
+        isChecking: false,
+        isDownloaded: false,
+        error: error.message
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   const handleClassification = async () => {
+    // Don't allow classification if model isn't downloaded
+    if (!modelStatus.isDownloaded) {
+      alert('Please download the model first')
+      return
+    }
+
     try {
       const result = await window.api.selectFolder()
       if (!result) return
@@ -22,7 +74,135 @@ function App() {
     }
   }
 
-  console.log('Predictionss:', predictions)
+  // Setup drag and drop event handlers
+  useEffect(() => {
+    const handleDragOver = (e) => {
+      console.log('Drag over:', e)
+      e.preventDefault()
+      // e.stopPropagation()
+      setIsDragging(true)
+    }
+
+    const handleDragLeave = (e) => {
+      e.preventDefault()
+      // e.stopPropagation()
+      setIsDragging(false)
+    }
+
+    const handleDrop = async (e) => {
+      console.log('Dropped:', e)
+      e.preventDefault()
+      // e.stopPropagation()
+      setIsDragging(false)
+
+      // Process dropped items
+      const items = e.dataTransfer.items
+      if (!items || items.length === 0) return
+
+      // Get directory path from dropped item
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const entry = item.webkitGetAsEntry()
+          if (entry && entry.isDirectory) {
+            setIsImporting(true)
+            try {
+              const file = item.getAsFile()
+              const result = await window.electron.importDroppedDirectory(file.path)
+
+              if (result.error) {
+                console.error('Import error:', result.error)
+                // Show error notification to user
+              } else {
+                // Handle successful import
+                console.log('Successfully imported:', result)
+                // Update your app state with the imported data
+              }
+            } catch (error) {
+              console.error('Error during import:', error)
+              // Show error notification to user
+            } finally {
+              setIsImporting(false)
+            }
+            break
+          }
+        }
+      }
+    }
+
+    // Add event listeners
+    document.body.addEventListener('dragover', handleDragOver)
+    document.body.addEventListener('dragleave', handleDragLeave)
+    document.body.addEventListener('drop', handleDrop)
+    console.log('Register')
+
+    // Clean up event listeners
+    return () => {
+      document.body.removeEventListener('dragover', handleDragOver)
+      document.body.removeEventListener('dragleave', handleDragLeave)
+      document.body.removeEventListener('drop', handleDrop)
+    }
+  }, [])
+
+  // Add a visual indicator for drag state
+  const dragOverlay = isDragging ? (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      }}
+    >
+      <div
+        style={{
+          padding: '2rem',
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          textAlign: 'center'
+        }}
+      >
+        <h2>Drop Camera Trap Directory to Import</h2>
+      </div>
+    </div>
+  ) : null
+
+  // Add a loading indicator for import process
+  const importingOverlay = isImporting ? (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      }}
+    >
+      <div
+        style={{
+          padding: '2rem',
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          textAlign: 'center'
+        }}
+      >
+        <h2>Importing Camera Trap Data...</h2>
+        <p>This may take a few moments</p>
+      </div>
+    </div>
+  ) : null
+
+  console.log('Predictions:', predictions)
 
   return (
     <div className={`relative flex min-h-svh flex-row`}>
@@ -67,12 +247,32 @@ function App() {
               <li>
                 <a
                   href="#"
-                  className="min-w-0 flex w-full items-center text-sm hover:bg-gray-100 rounded-md px-2 h-7"
+                  className="min-w-0 flex w-full items-center justify-between text-sm hover:bg-gray-100 rounded-md px-2 h-7"
                 >
-                  Google/Speciesnet
+                  <span>Google/Speciesnet</span>
+                  {modelStatus.isChecking ? (
+                    <span className="animate-pulse">...</span>
+                  ) : modelStatus.isDownloaded ? (
+                    <CheckCircle size={16} className="text-green-500" />
+                  ) : isDownloading ? (
+                    <Download size={16} className="animate-pulse text-blue-500" />
+                  ) : (
+                    <button
+                      onClick={handleModelDownload}
+                      className="text-blue-500 hover:text-blue-700"
+                      title="Download model"
+                    >
+                      <Download size={16} />
+                    </button>
+                  )}
                 </a>
+                {modelStatus.error && (
+                  <div className="text-xs text-red-500 px-2 py-1 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    <span>Error: {modelStatus.error}</span>
+                  </div>
+                )}
               </li>
-              
             </ul>
           </li>
         </ul>
@@ -91,11 +291,29 @@ function App() {
               </p>
               <button
                 onClick={handleClassification}
-                className="cursor-pointer hover:bg-gray-50 transition-colors mt-8 flex justify-center flex-row gap-2 items-center border border-gray-200 px-2 h-10 text-sm shadow-sm rounded-md"
+                disabled={!modelStatus.isDownloaded}
+                className={`cursor-pointer transition-colors mt-8 flex justify-center flex-row gap-2 items-center border border-gray-200 px-2 h-10 text-sm shadow-sm rounded-md ${
+                  modelStatus.isDownloaded ? 'hover:bg-gray-50' : 'opacity-50 cursor-not-allowed'
+                }`}
               >
                 <ImageIcon color="black" size={20} className="pb-[2px]" />
-                Start Importing
+                {!modelStatus.isDownloaded ? 'Download Model First' : 'Start Importing'}
               </button>
+              {!modelStatus.isDownloaded && !isDownloading && (
+                <button
+                  onClick={handleModelDownload}
+                  className="cursor-pointer hover:bg-blue-50 transition-colors flex justify-center flex-row gap-2 items-center border border-blue-200 px-2 h-10 text-sm shadow-sm rounded-md text-blue-600"
+                >
+                  <Download size={20} className="pb-[2px]" />
+                  Download Model
+                </button>
+              )}
+              {isDownloading && (
+                <div className="flex justify-center items-center gap-2 text-blue-600">
+                  <Download size={20} className="animate-pulse" />
+                  <span>Downloading model...</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -149,6 +367,11 @@ function App() {
           </div>
         )}
       </main>
+      {/* Drag overlay */}
+      {dragOverlay}
+
+      {/* Import loading overlay */}
+      {importingOverlay}
     </div>
   )
 }
