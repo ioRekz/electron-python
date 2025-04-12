@@ -182,7 +182,7 @@ function AppContent() {
         <header className="p-2">
           <div className="text-base font-semibold p-2 flex items-center">
             <Camera color="black" size={24} className="rotate-[80deg]" />
-            <span className="pt-[3px]">iowatch</span>
+            <span className="pt-[3px]">Biowatch</span>
           </div>
         </header>
         <ul className="flex w-full min-w-0 flex-col gap-4 p-2">
