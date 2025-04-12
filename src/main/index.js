@@ -21,6 +21,7 @@ import path from 'path'
 import { pipeline } from 'stream/promises'
 import { importCamTrapDataset } from './camtrap'
 import { getSpeciesDistribution, getDeployments, getDeploymentsActivity } from './queries'
+import { autoUpdater } from 'electron-updater'
 
 // Configure electron-log
 log.transports.file.level = 'info'
@@ -28,6 +29,9 @@ log.transports.console.level = 'info'
 
 let pythonProcess = null
 let serverPort = null
+
+autoUpdater.logger = log
+autoUpdater.checkForUpdatesAndNotify()
 
 function findFreePort() {
   return new Promise((resolve, reject) => {
