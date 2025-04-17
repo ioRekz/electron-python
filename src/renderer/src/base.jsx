@@ -52,8 +52,8 @@ function AppContent() {
       setIsImporting(true)
 
       try {
-        const { id, data } = await window.api.importDroppedDirectory(files[0])
-        onNewStudy({ id, name: data.name, data })
+        const { id, data, path } = await window.api.importDroppedDirectory(files[0])
+        onNewStudy({ id, name: data.name, data, path })
         navigate(`/study/${id}`)
       } finally {
         setIsImporting(false)
@@ -181,8 +181,8 @@ function AppContent() {
       <div className="w-52 h-full p-2 fixed">
         <header className="p-2">
           <div className="text-base font-semibold p-2 flex items-center">
-            <Camera color="black" size={24} className="rotate-[80deg]" />
             <span className="pt-[3px]">Biowatch</span>
+            <Camera color="black" size={24} className="rotate-[80deg]" />
           </div>
         </header>
         <ul className="flex w-full min-w-0 flex-col gap-4 p-2">

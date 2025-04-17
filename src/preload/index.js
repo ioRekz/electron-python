@@ -1,5 +1,6 @@
 import { contextBridge, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { getLocationsActivity } from '../main/queries'
 
 // Custom APIs for renderer
 const api = {
@@ -39,6 +40,24 @@ const api = {
   },
   getDeploymentsActivity: async (studyId) => {
     return await electronAPI.ipcRenderer.invoke('get-deployments-activity', studyId)
+  },
+  getTopSpeciesTimeseries: async (studyId) => {
+    return await electronAPI.ipcRenderer.invoke('get-top-species-timeseries', studyId)
+  },
+  getSpeciesHeatmapData: async (studyId, species, startDate, endDate) => {
+    return await electronAPI.ipcRenderer.invoke(
+      'get-species-heatmap-data',
+      studyId,
+      species,
+      startDate,
+      endDate
+    )
+  },
+  getLocationsActivity: async (studyId) => {
+    return await electronAPI.ipcRenderer.invoke('get-locations-activity', studyId)
+  },
+  getLatestMedia: async (studyId, limit = 10) => {
+    return await electronAPI.ipcRenderer.invoke('get-latest-media', studyId, limit)
   }
 }
 

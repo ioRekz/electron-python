@@ -1,12 +1,10 @@
-import { ChartBar, NotebookText, Camera, CameraIcon, Cctv } from 'lucide-react'
-import { Route, Routes, NavLink, useParams } from 'react-router'
-import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import { Cctv, ChartBar, Image, NotebookText } from 'lucide-react'
+import { NavLink, Route, Routes, useParams } from 'react-router'
 import Deployments from './deployments'
 import Overview from './overview'
-
-
+import Activity from './activity'
+import Media from './media'
 
 export default function Study() {
   let { id } = useParams()
@@ -26,30 +24,40 @@ export default function Study() {
           Overview
         </NavLink>
         <NavLink
-          to={`/study/${id}/analysis`}
+          to={`/study/${id}/activity`}
           className={({ isActive }) =>
-            `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm rounded-tl-md`
+            `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm`
           }
         >
           <ChartBar color="black" size={20} className="pb-[2px]" />
-          Analysis
+          Activity
         </NavLink>
         <NavLink
           to={`/study/${id}/deployments`}
           className={({ isActive }) =>
-            `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm rounded-tl-md`
+            `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm`
           }
         >
           <Cctv color="black" size={20} className="pb-[2px]" />
           Deployments
         </NavLink>
+        <NavLink
+          to={`/study/${id}/media`}
+          className={({ isActive }) =>
+            `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm rounded-tr-md`
+          }
+        >
+          <Image color="black" size={20} className="pb-[2px]" />
+          Media
+        </NavLink>
       </header>
-      <div className="flex-1 overflow-y-auto h-full">
-      <Routes>
-        <Route index element={<Overview data={study.data} studyId={id} />} />
-        <Route path="analysis" element={<div>Analysis</div>} />
-        <Route path="deployments" element={<Deployments studyId={id} />} />
-      </Routes>
+      <div className="flex-1 overflow-y-auto h-full pb-4">
+        <Routes>
+          <Route index element={<Overview data={study.data} studyId={id} />} />
+          <Route path="activity" element={<Activity studyData={study.data} studyId={id} />} />
+          <Route path="deployments" element={<Deployments studyId={id} />} />
+          <Route path="media" element={<Media studyId={id} path={study.path} />} />
+        </Routes>
       </div>
     </div>
   )

@@ -20,7 +20,15 @@ import net from 'net'
 import path from 'path'
 import { pipeline } from 'stream/promises'
 import { importCamTrapDataset } from './camtrap'
-import { getSpeciesDistribution, getDeployments, getDeploymentsActivity } from './queries'
+import {
+  getSpeciesDistribution,
+  getDeployments,
+  getDeploymentsActivity,
+  getTopSpeciesTimeseries,
+  getSpeciesHeatmapData,
+  getLocationsActivity,
+  getLatestMedia
+} from './queries'
 import { autoUpdater } from 'electron-updater'
 
 // Configure electron-log
@@ -286,8 +294,9 @@ function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1300,
     height: 800,
-    show: false,
-    autoHideMenuBar: true,
+    // show: false,
+    // frame: false,
+    // titleBarStyle: 'hidden',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -444,6 +453,55 @@ app.whenReady().then(async () => {
       return { error: error.message }
     }
   })
+
+  ipcMain.handle('get-top-species-timeseries', async (_, studyId) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const timeseriesData = await getTopSpeciesTimeseries(dbPath)
+      return { data: timeseriesData }
+    } catch (error) {
+      log.error('Error getting top species timeseries:', error)
+      return { error: error.message }
+    }
+  })
+
+  ipcMain.handle('get-species-heatmap-data', async (_, studyId, species, startDate, endDate) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const heatmapData = await getSpeciesHeatmapData(dbPath, species, startDate, endDate)
+      return { data: heatmapData }
+    } catch (error) {
+      log.error('Error getting species heatmap data:', error)
+      return { error: error.message }
+    }
+  })
+
+  ipcMain.handle('get-locations-activity', async (_, studyId) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const activity = await getLocationsActivity(dbPath)
+      return { data: activity }
+    } catch (error) {
+      log.error('Error getting locations activity:', error)
+      return { error: error.message }
+    }
+  })
+
   // Add drag and drop handler
   ipcMain.handle('import-dropped-directory', async (_, directoryPath) => {
     try {
@@ -520,6 +578,23 @@ app.whenReady().then(async () => {
     } catch (error) {
       log.error('Error deleting study database:', error)
       return { error: error.message, success: false }
+    }
+  })
+
+  // Add media handler
+  ipcMain.handle('get-latest-media', async (_, studyId, limit = 10) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const media = await getLatestMedia(dbPath, limit)
+      return { data: media }
+    } catch (error) {
+      log.error('Error getting latest media:', error)
+      return { error: error.message }
     }
   })
 
