@@ -1,21 +1,20 @@
-import { useState, useEffect, useRef, useCallback, use } from 'react'
-import { useParams } from 'react-router'
-import { MapContainer, TileLayer, LayersControl, Marker, Popup } from 'react-leaflet'
-import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import CircularTimeFilter from './clock'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { LayersControl, MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
+import MarkerClusterGroup from 'react-leaflet-cluster'
+import { useParams } from 'react-router'
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
   CartesianGrid,
+  Customized,
+  Line,
+  LineChart,
   Rectangle,
-  Customized
+  ResponsiveContainer,
+  XAxis,
+  YAxis
 } from 'recharts'
+import CircularTimeFilter from './clock'
 
 // TimelineChart component using Recharts
 const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRange, palette }) => {
@@ -54,7 +53,7 @@ const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRang
 
   // Custom component for the selection rectangle
   const SelectionRangeRectangle = (props) => {
-    const { chartWidth, width, height, margin, xAxisMap, formattedGraphicalItems } = props
+    const { height, margin, xAxisMap } = props
 
     if (!dateRange[0] || !dateRange[1] || !data || data.length === 0 || !xAxisMap) {
       console.log('No date range or data available')
@@ -248,23 +247,6 @@ const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRang
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }, [handleMouseMove])
-
-  // Custom tooltip to show multiple species values
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-2 border border-gray-200 shadow-md rounded text-xs">
-          <p className="font-semibold">{label.toISOString()}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }}>
-              {entry.name}: {entry.value}
-            </p>
-          ))}
-        </div>
-      )
-    }
-    return null
-  }
 
   return (
     <div className="w-full h-full">
@@ -515,7 +497,7 @@ const SpeciesMap = ({ heatmapData, selectedSpecies, palette }) => {
 
               // Filter out species with zero counts to avoid empty slices
               const filteredCounts = Object.fromEntries(
-                Object.entries(combinedCounts).filter(([_, count]) => count > 0)
+                Object.entries(combinedCounts).filter(([, count]) => count > 0)
               )
 
               return createPieChartIcon(filteredCounts)
@@ -750,7 +732,6 @@ export default function Activity({ studyData, studyId }) {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [allSpecies, setAllSpecies] = useState([])
   const [selectedSpecies, setSelectedSpecies] = useState([])
   const [dateRange, setDateRange] = useState([null, null])
   const [timeRange, setTimeRange] = useState({ start: 0, end: 24 })
@@ -773,7 +754,6 @@ export default function Activity({ studyData, studyId }) {
           setError(response.error)
         } else {
           setTimeseriesData(response.data.timeseries)
-          setAllSpecies(response.data.allSpecies)
 
           // Default select the top 2 species
           setSelectedSpecies(response.data.allSpecies.slice(0, 2))

@@ -140,11 +140,11 @@ const CircularTimeFilter = ({ onChange, startTime = 6, endTime = 18 }) => {
     return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY}`
   }
 
-  const formatTime = (time) => {
-    const hours = Math.floor(time)
-    const minutes = Math.round((time - hours) * 60)
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
-  }
+  // const formatTime = (time) => {
+  //   const hours = Math.floor(time)
+  //   const minutes = Math.round((time - hours) * 60)
+  //   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+  // }
 
   return (
     <div className="flex flex-col items-center">

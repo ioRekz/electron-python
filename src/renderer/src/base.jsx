@@ -1,4 +1,4 @@
-import { Camera, PlusCircle, Plus } from 'lucide-react'
+import { Camera, Plus } from 'lucide-react'
 import { HashRouter, NavLink, Route, Routes, useNavigate, useLocation } from 'react-router'
 import Import from './import'
 import Study from './study'
