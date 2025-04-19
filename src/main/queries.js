@@ -435,8 +435,8 @@ export async function getTopSpeciesTimeseries(dbPath) {
         return reject(err)
       }
 
-      // First, identify the top 2 species by observation count
-      const topSpeciesQuery = `
+      // First, identify all species by observation count
+      const speciesQuery = `
         SELECT
           scientificName,
           COUNT(*) as count
@@ -444,24 +444,24 @@ export async function getTopSpeciesTimeseries(dbPath) {
         WHERE scientificName IS NOT NULL AND scientificName != ''
         GROUP BY scientificName
         ORDER BY count DESC
-        LIMIT 2
       `
 
-      db.all(topSpeciesQuery, [], (err, topSpecies) => {
+      db.all(speciesQuery, [], (err, allSpecies) => {
         if (err) {
           db.close()
-          log.error(`Error querying top species: ${err.message}`)
+          log.error(`Error querying all species: ${err.message}`)
           return reject(err)
         }
 
-        if (topSpecies.length === 0) {
+        if (allSpecies.length === 0) {
           db.close()
           log.info('No species data found')
-          return resolve({ topSpecies: [], timeseries: [] })
+          return resolve({ allSpecies: [], timeseries: [] })
         }
 
         // Extract species names for the IN clause
-        const speciesNames = topSpecies
+        const top2SpeciesNames = allSpecies
+          .slice(0, 2)
           .map((s) => `'${s.scientificName.replace(/'/g, "''")}'`)
           .join(',')
 
@@ -472,7 +472,6 @@ export async function getTopSpeciesTimeseries(dbPath) {
               date(min(substr(eventStart, 1, 10)), 'weekday 0') AS start_week,
               date(max(substr(eventStart, 1, 10)), 'weekday 0') AS end_week
             FROM observations
-            WHERE scientificName IN (${speciesNames})
           ),
           weeks(week_start) AS (
             SELECT start_week FROM date_range
@@ -484,7 +483,7 @@ export async function getTopSpeciesTimeseries(dbPath) {
           species_list AS (
             SELECT scientificName
             FROM observations
-            WHERE scientificName IN (${speciesNames})
+            WHERE scientificName IS NOT NULL AND scientificName != ''
             GROUP BY scientificName
           ),
           week_species_combinations AS (
@@ -500,7 +499,7 @@ export async function getTopSpeciesTimeseries(dbPath) {
               scientificName,
               COUNT(*) as count
             FROM observations
-            WHERE scientificName IN (${speciesNames})
+            WHERE scientificName IS NOT NULL AND scientificName != ''
             GROUP BY observation_week, scientificName
           )
           SELECT
@@ -524,12 +523,9 @@ export async function getTopSpeciesTimeseries(dbPath) {
           // Process the SQL results into the expected format
           const processedData = processTimeseriesDataFromSql(timeseries)
 
-          log.info(`Retrieved timeseries data: ${processedData.length} weeks`)
+          log.info(`Retrieved timeseries data: ${processedData.length} weeks for all species`)
           resolve({
-            topSpecies: topSpecies.map((s) => ({
-              scientificName: s.scientificName,
-              count: s.count
-            })),
+            allSpecies: allSpecies,
             timeseries: processedData
           })
         })
@@ -538,26 +534,122 @@ export async function getTopSpeciesTimeseries(dbPath) {
   })
 }
 
-// Helper function to process timeseries data from SQL query
-function processTimeseriesDataFromSql(rawData) {
-  const resultMap = new Map()
+/**
+ * Get daily timeseries data for specific species
+ * @param {string} dbPath - Path to the SQLite database
+ * @param {Array<string>} speciesNames - List of scientific names to include
+ * @returns {Promise<Object>} - Timeseries data for specified species
+ */
+export async function getSpeciesTimeseries(dbPath, speciesNames = []) {
+  return new Promise((resolve, reject) => {
+    log.info(`Querying species timeseries from: ${dbPath} for specific species`)
+    log.info(`Selected species: ${speciesNames.join(', ')}`)
 
-  // Group by date and collect counts for each species
-  rawData.forEach((entry) => {
-    if (!resultMap.has(entry.date)) {
-      resultMap.set(entry.date, {})
-    }
-    const dateEntry = resultMap.get(entry.date)
-    dateEntry[entry.scientificName] = entry.count
+    // Open the database
+    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
+      if (err) {
+        log.error(`Error opening database: ${err.message}`)
+        return reject(err)
+      }
+
+      // Prepare IN clause for selected species if provided
+      let speciesClause = ''
+      let speciesFilter = ''
+
+      if (speciesNames && speciesNames.length > 0) {
+        const quotedSpecies = speciesNames.map((name) => `'${name.replace(/'/g, "''")}'`).join(',')
+        speciesClause = `WHERE scientificName IN (${quotedSpecies})`
+        speciesFilter = `AND scientificName IN (${quotedSpecies})`
+      }
+
+      // Query using recursive CTE to generate week series and join with observations
+      const timeseriesQuery = `
+        WITH date_range AS (
+          SELECT
+            date(min(substr(eventStart, 1, 10)), 'weekday 0') AS start_week,
+            date(max(substr(eventStart, 1, 10)), 'weekday 0') AS end_week
+          FROM observations
+        ),
+        weeks(week_start) AS (
+          SELECT start_week FROM date_range
+          UNION ALL
+          SELECT date(week_start, '+7 days')
+          FROM weeks, date_range
+          WHERE week_start < end_week
+        ),
+        species_list AS (
+          SELECT
+            scientificName,
+            COUNT(*) as count
+          FROM observations
+          WHERE scientificName IS NOT NULL AND scientificName != ''
+          ${speciesFilter ? speciesFilter : ''}
+          GROUP BY scientificName
+        ),
+        week_species_combinations AS (
+          SELECT
+            weeks.week_start,
+            species_list.scientificName
+          FROM weeks
+          CROSS JOIN species_list
+        ),
+        weekly_counts AS (
+          SELECT
+            date(substr(eventStart, 1, 10), 'weekday 0') as observation_week,
+            scientificName,
+            COUNT(*) as count
+          FROM observations
+          WHERE scientificName IS NOT NULL AND scientificName != ''
+          ${speciesFilter ? speciesFilter : ''}
+          GROUP BY observation_week, scientificName
+        )
+        SELECT
+          wsc.week_start as date,
+          wsc.scientificName,
+          COALESCE(wc.count, 0) as count,
+          sl.count as total_count
+        FROM week_species_combinations wsc
+        LEFT JOIN weekly_counts wc ON wsc.week_start = wc.observation_week
+          AND wsc.scientificName = wc.scientificName
+        JOIN species_list sl ON wsc.scientificName = sl.scientificName
+        ORDER BY wsc.week_start ASC, wsc.scientificName
+      `
+
+      db.all(timeseriesQuery, [], (err, timeseries) => {
+        db.close()
+
+        if (err) {
+          log.error(`Error querying timeseries: ${err.message}`)
+          return reject(err)
+        }
+
+        // Process the SQL results into the expected format
+        const processedData = processTimeseriesDataFromSql(timeseries)
+
+        // Extract species metadata from the timeseries data
+        const speciesMap = new Map()
+        timeseries.forEach((row) => {
+          if (!speciesMap.has(row.scientificName)) {
+            speciesMap.set(row.scientificName, {
+              scientificName: row.scientificName,
+              count: row.total_count
+            })
+          }
+        })
+
+        // Convert the map to an array and sort by count descending
+        const speciesData = Array.from(speciesMap.values()).sort((a, b) => b.count - a.count)
+
+        log.info(
+          `Retrieved timeseries data: ${processedData.length} weeks for ${speciesData.length} species`
+        )
+        resolve({
+          allSpecies: speciesData,
+          timeseries: processedData
+        })
+      })
+    })
   })
-
-  // Convert map to array format
-  return Array.from(resultMap.entries())
-    .map(([date, speciesCounts]) => ({
-      date,
-      ...speciesCounts
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date))
 }
 
 /**
@@ -566,12 +658,22 @@ function processTimeseriesDataFromSql(rawData) {
  * @param {Array<string>} species - List of scientific names to include
  * @param {string} startDate - ISO date string for range start
  * @param {string} endDate - ISO date string for range end
+ * @param {number} startHour - Starting hour of day (0-24)
+ * @param {number} endHour - Ending hour of day (0-24)
  * @returns {Promise<Object>} - Species geolocation data for heatmap
  */
-export async function getSpeciesHeatmapData(dbPath, species, startDate, endDate) {
+export async function getSpeciesHeatmapData(
+  dbPath,
+  species,
+  startDate,
+  endDate,
+  startHour = 0,
+  endHour = 24
+) {
   return new Promise((resolve, reject) => {
     log.info(`Querying species heatmap data from: ${dbPath}`)
     log.info(`Date range: ${startDate} to ${endDate}`)
+    log.info(`Time range: ${startHour} to ${endHour} hours`)
     log.info(`Species: ${species.join(', ')}`)
 
     const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
@@ -582,6 +684,23 @@ export async function getSpeciesHeatmapData(dbPath, species, startDate, endDate)
 
       // Extract species names for the IN clause with proper escaping
       const speciesNames = species.map((s) => `'${s.replace(/'/g, "''")}'`).join(',')
+
+      // Time of day query condition
+      let timeCondition = ''
+      if (startHour < endHour) {
+        // Simple range (e.g., 8:00 to 17:00)
+        timeCondition = `
+          AND CAST(strftime('%H', o.eventStart) AS INTEGER) >= ${startHour}
+          AND CAST(strftime('%H', o.eventStart) AS INTEGER) < ${endHour}
+        `
+      } else if (startHour > endHour) {
+        // Wrapping range (e.g., 22:00 to 6:00)
+        timeCondition = `
+          AND CAST(strftime('%H', o.eventStart) AS INTEGER) >= ${startHour}
+          OR CAST(strftime('%H', o.eventStart) AS INTEGER) < ${endHour}
+        `
+      }
+      // If startHour equals endHour, we include all hours (full day)
 
       // Query to get observation counts by location and species
       const query = `
@@ -599,6 +718,7 @@ export async function getSpeciesHeatmapData(dbPath, species, startDate, endDate)
           AND o.eventStart <= ?
           AND d.latitude IS NOT NULL
           AND d.longitude IS NOT NULL
+          ${timeCondition}
         GROUP BY d.latitude, d.longitude, o.scientificName
         ORDER BY count DESC
       `
@@ -684,4 +804,26 @@ export async function getLatestMedia(dbPath, limit = 10) {
       })
     })
   })
+}
+
+// Helper function to process timeseries data from SQL query
+function processTimeseriesDataFromSql(rawData) {
+  const resultMap = new Map()
+
+  // Group by date and collect counts for each species
+  rawData.forEach((entry) => {
+    if (!resultMap.has(entry.date)) {
+      resultMap.set(entry.date, {})
+    }
+    const dateEntry = resultMap.get(entry.date)
+    dateEntry[entry.scientificName] = entry.count
+  })
+
+  // Convert map to array format
+  return Array.from(resultMap.entries())
+    .map(([date, speciesCounts]) => ({
+      date,
+      ...speciesCounts
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date))
 }

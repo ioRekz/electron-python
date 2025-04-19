@@ -4,9 +4,10 @@ import { MapContainer, TileLayer, LayersControl, Marker, Popup } from 'react-lea
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import CircularTimeFilter from './clock'
 
 // TimelineChart component
-const TimelineChart = ({ timeseriesData, topSpecies, dateRange, setDateRange }) => {
+const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRange, palette }) => {
   const svgRef = useRef(null)
   const containerRef = useRef(null)
   const dragRef = useRef({
@@ -102,7 +103,9 @@ const TimelineChart = ({ timeseriesData, topSpecies, dateRange, setDateRange }) 
     if (!timeseriesData || timeseriesData.length === 0) return ''
 
     const maxValue = Math.max(
-      ...timeseriesData.map((day) => Math.max(...topSpecies.map((s) => day[s.scientificName] || 0)))
+      ...timeseriesData.map((day) =>
+        Math.max(...selectedSpecies.map((s) => day[s.scientificName] || 0))
+      )
     )
 
     const xScale = width / Math.max(timeseriesData.length - 1, 1)
@@ -138,15 +141,8 @@ const TimelineChart = ({ timeseriesData, topSpecies, dateRange, setDateRange }) 
         height="100%"
         className="bg-white rounded flex-grow"
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        preserveAspectRatio="xMidYMid meet"
       >
-        <line
-          x1="0"
-          y1={height - xAxisHeight}
-          x2={width}
-          y2={height - xAxisHeight}
-          stroke="black"
-        />
+        <line x1="0" y1={height - xAxisHeight} x2={width} y2={height - xAxisHeight} stroke="#999" />
 
         {timeseriesData &&
           timeseriesData
@@ -165,7 +161,9 @@ const TimelineChart = ({ timeseriesData, topSpecies, dateRange, setDateRange }) 
                 }
                 y={height - 5}
                 textAnchor="middle"
-                fontSize="12"
+                fontSize="8"
+                fontFamily="Inter"
+                fill="#777"
               >
                 {new Date(day.date).toLocaleDateString(undefined, {
                   month: 'short',
@@ -175,25 +173,16 @@ const TimelineChart = ({ timeseriesData, topSpecies, dateRange, setDateRange }) 
               </text>
             ))}
 
-        {topSpecies.length > 0 && (
+        {selectedSpecies.map((species, index) => (
           <path
-            d={generateLinePath(topSpecies[0].scientificName)}
+            key={species.scientificName}
+            d={generateLinePath(species.scientificName)}
             fill="none"
-            stroke="blue"
+            stroke={palette[index % palette.length]}
             strokeWidth="2"
             opacity="0.7"
           />
-        )}
-
-        {topSpecies.length > 1 && (
-          <path
-            d={generateLinePath(topSpecies[1].scientificName)}
-            fill="none"
-            stroke="green"
-            strokeWidth="2"
-            opacity="0.7"
-          />
-        )}
+        ))}
 
         {dateRange[0] && dateRange[1] && timeseriesData.length > 0 && (
           <rect
@@ -271,7 +260,7 @@ const TimelineChart = ({ timeseriesData, topSpecies, dateRange, setDateRange }) 
 }
 
 // SpeciesMap component
-const SpeciesMap = ({ heatmapData, topSpecies }) => {
+const SpeciesMap = ({ heatmapData, selectedSpecies, palette }) => {
   // Function to create a pie chart icon
   const createPieChartIcon = (counts) => {
     const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
@@ -297,12 +286,7 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
 
       // Draw pie slices
       let startAngle = 0
-      const colors = [
-        'rgba(0, 0, 255, 0.8)',
-        'rgba(0, 128, 0, 0.8)',
-        'rgba(255, 0, 0, 0.8)',
-        'rgba(255, 165, 0, 0.8)'
-      ]
+      const colors = selectedSpecies.map((_, i) => palette[i % palette.length])
 
       // Use the same radius for pie slices as for the circle
       const radius = 50
@@ -310,9 +294,9 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
       // Special case for single species - draw a full circle
       if (Object.keys(counts).length === 1) {
         const species = Object.keys(counts)[0]
-        const index = topSpecies.findIndex((s) => s.scientificName === species)
+        const index = selectedSpecies.findIndex((s) => s.scientificName === species)
         const colorIndex = index >= 0 ? index : 0
-        const color = colors[colorIndex % colors.length]
+        const color = colors[colorIndex]
 
         const circle = document.createElementNS(svgNS, 'circle')
         circle.setAttribute('cx', '50')
@@ -322,10 +306,13 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
         svg.appendChild(circle)
       } else {
         // Multiple species - draw pie slices
-        Object.entries(counts).forEach(([species, count], index) => {
+        Object.entries(counts).forEach(([species, count]) => {
+          const index = selectedSpecies.findIndex((s) => s.scientificName === species)
+          if (index < 0) return // Skip if species not in selectedSpecies
+
           const portion = count / total
           const endAngle = startAngle + portion * 2 * Math.PI
-          const color = colors[index % colors.length]
+          const color = colors[index]
 
           const largeArcFlag = portion > 0.5 ? 1 : 0
 
@@ -372,7 +359,7 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
     const locations = {}
 
     // Combine data from all species
-    topSpecies.slice(0, 4).forEach((species) => {
+    selectedSpecies.forEach((species) => {
       const speciesName = species.scientificName
       const points = heatmapData?.[speciesName] || []
 
@@ -412,8 +399,6 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
         )
       : null
 
-  console.log('bounds', bounds)
-
   // Only use bounds if we have points and the bounds are valid
   const shouldUseBounds =
     bounds &&
@@ -432,18 +417,28 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
       boundsOptions={shouldUseBounds ? boundsOptions : undefined}
       className="rounded w-full h-full border border-gray-200"
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-
       <LayersControl position="topright">
+        <LayersControl.BaseLayer name="Street Map" checked={true}>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        </LayersControl.BaseLayer>
+
+        <LayersControl.BaseLayer name="Satellite">
+          <TileLayer
+            attribution='&copy; <a href="https://www.esri.com">Esri</a>'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          />
+        </LayersControl.BaseLayer>
+
         <LayersControl.Overlay name="Species Distribution" checked={true}>
           <MarkerClusterGroup
+            key={selectedSpecies.map((s) => s.scientificName).join(',')}
             chunkedLoading
             showCoverageOnHover={false}
-            // spiderfyOnMaxZoom={true}
-            maxClusterRadius={200}
+            spiderfyOnEveryZoom={false}
+            maxClusterRadius={100}
             animateAddingMarkers={false}
             iconCreateFunction={(cluster) => {
               // Get all markers in this cluster
@@ -451,18 +446,28 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
 
               // Combine counts from all markers
               const combinedCounts = {}
+
+              // First, initialize counts for all selected species to ensure consistent ordering
+              selectedSpecies.forEach((species) => {
+                combinedCounts[species.scientificName] = 0
+              })
+
+              // Then add actual counts from markers
               markers.forEach((marker) => {
                 Object.entries(marker.options.counts).forEach(([species, count]) => {
-                  if (!combinedCounts[species]) combinedCounts[species] = 0
-                  combinedCounts[species] += count
+                  // Only add species that are in our selectedSpecies list
+                  if (selectedSpecies.some((s) => s.scientificName === species)) {
+                    combinedCounts[species] += count
+                  }
                 })
               })
 
-              // return null
+              // Filter out species with zero counts to avoid empty slices
+              const filteredCounts = Object.fromEntries(
+                Object.entries(combinedCounts).filter(([_, count]) => count > 0)
+              )
 
-              console.log('make icon')
-
-              return createPieChartIcon(combinedCounts)
+              return createPieChartIcon(filteredCounts)
             }}
           >
             {locationPoints.map((point, index) => (
@@ -472,7 +477,7 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
                 icon={createPieChartIcon(point.counts)}
                 counts={point.counts}
               >
-                {/* <Popup>
+                <Popup>
                   <div className="text-sm">
                     <h3 className="font-bold mb-1">Species Data</h3>
                     <ul>
@@ -483,7 +488,7 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
                       ))}
                     </ul>
                   </div>
-                </Popup> */}
+                </Popup>
               </Marker>
             ))}
           </MarkerClusterGroup>
@@ -491,28 +496,23 @@ const SpeciesMap = ({ heatmapData, topSpecies }) => {
 
         {/* Add a legend */}
         <div className="absolute bottom-5 right-5 bg-white p-2 rounded shadow-md z-[1000]">
-          <h4 className="text-sm font-bold mb-1">Legend</h4>
-          {topSpecies.slice(0, 4).map((species, index) => {
-            const colors = ['blue', 'green', 'red', 'orange']
-            return (
-              <div key={index} className="flex items-center space-x-2">
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: colors[index % colors.length] }}
-                ></div>
-                <span className="text-xs">{species.scientificName}</span>
-              </div>
-            )
-          })}
+          {selectedSpecies.map((species, index) => (
+            <div key={index} className="flex items-center space-x-2 space-y-1">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: palette[index % palette.length] }}
+              ></div>
+              <span className="text-xs">{species.scientificName}</span>
+            </div>
+          ))}
         </div>
       </LayersControl>
     </MapContainer>
   )
 }
 
-function SpeciesDistribution({ data, taxonomicData }) {
+function SpeciesDistribution({ data, taxonomicData, selectedSpecies, onSpeciesChange, palette }) {
   const [commonNames, setCommonNames] = useState({})
-  const [isLoadingNames, setIsLoadingNames] = useState(false)
 
   const totalCount = data.reduce((sum, item) => sum + item.count, 0)
 
@@ -582,7 +582,6 @@ function SpeciesDistribution({ data, taxonomicData }) {
 
       if (missingCommonNames.length === 0) return
 
-      setIsLoadingNames(true)
       const newCommonNames = { ...commonNames }
 
       // Fetch common names for species with missing common names
@@ -596,11 +595,32 @@ function SpeciesDistribution({ data, taxonomicData }) {
       )
 
       setCommonNames(newCommonNames)
-      setIsLoadingNames(false)
     }
 
     fetchMissingCommonNames()
   }, [data, taxonomicData])
+
+  // Handle toggling species selection when clicking on the dot
+  const handleSpeciesToggle = (species) => {
+    // Find if this species is already selected
+    const isSelected = selectedSpecies.some((s) => s.scientificName === species.scientificName)
+
+    let newSelectedSpecies
+    if (isSelected) {
+      // Remove from selection
+      newSelectedSpecies = selectedSpecies.filter(
+        (s) => s.scientificName !== species.scientificName
+      )
+    } else {
+      // Add to selection
+      newSelectedSpecies = [...selectedSpecies, species]
+    }
+
+    // Make sure we always have at least one species selected
+    if (newSelectedSpecies.length > 0) {
+      onSpeciesChange(newSelectedSpecies)
+    }
+  }
 
   if (!data || data.length === 0) {
     return <div className="text-gray-500">No species data available</div>
@@ -616,14 +636,33 @@ function SpeciesDistribution({ data, taxonomicData }) {
             commonNames[species.scientificName] ||
             'Unknown'
 
+          const isSelected = selectedSpecies.some(
+            (s) => s.scientificName === species.scientificName
+          )
+          const colorIndex = selectedSpecies.findIndex(
+            (s) => s.scientificName === species.scientificName
+          )
+          const color = colorIndex >= 0 ? palette[colorIndex % palette.length] : '#ccc'
+
           return (
-            <div key={index} className="">
-              <div className="flex justify-between mb-1 items-center">
-                <div>
+            <div
+              key={index}
+              className="cursor-pointer group"
+              onClick={() => handleSpeciesToggle(species)}
+            >
+              <div className="flex justify-between mb-1 items-center cursor-pointer">
+                <div className="flex items-center cursor-pointer">
+                  <div
+                    className={`w-2 h-2 rounded-full mr-2 border cursor-pointer ${isSelected ? `border-transparent bg-[${color}]` : 'border-gray-300'} group-hover:bg-gray-800 `}
+                    style={{
+                      backgroundColor: isSelected ? color : null
+                    }}
+                  ></div>
+
                   <span className="capitalize text-sm">{commonName}</span>
                   {species.scientificName && (
                     <span className="text-gray-500 text-sm italic ml-2">
-                      ({species.scientificName})
+                      {species.scientificName}
                     </span>
                   )}
                 </div>
@@ -631,8 +670,11 @@ function SpeciesDistribution({ data, taxonomicData }) {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
-                  className="bg-blue-600 h-2 rounded-full"
-                  style={{ width: `${(species.count / totalCount) * 100}%` }}
+                  className="h-2 rounded-full"
+                  style={{
+                    width: `${(species.count / totalCount) * 100}%`,
+                    backgroundColor: isSelected ? color : '#ccc'
+                  }}
                 ></div>
               </div>
             </div>
@@ -643,74 +685,30 @@ function SpeciesDistribution({ data, taxonomicData }) {
   )
 }
 
+const palette = [
+  'hsl(173 58% 39%)',
+  'hsl(43 74% 66%)',
+  'hsl(12 76% 61%)',
+  'hsl(197 37% 24%)',
+  'hsl(27 87% 67%)'
+]
+
 export default function Activity({ studyData, studyId }) {
   const { id } = useParams()
   const actualStudyId = studyId || id // Use passed studyId or from params
-  const [timeseriesData, setTimeseriesData] = useState(null)
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [topSpecies, setTopSpecies] = useState([])
+  const [allSpecies, setAllSpecies] = useState([])
+  const [selectedSpecies, setSelectedSpecies] = useState([])
   const [dateRange, setDateRange] = useState([null, null])
+  const [timeRange, setTimeRange] = useState({ start: 0, end: 24 })
+  const [timeseriesData, setTimeseriesData] = useState(null)
   const [heatmapData, setHeatmapData] = useState(null)
-  const [mapLoading, setMapLoading] = useState(false)
   const [speciesDistributionData, setSpeciesDistributionData] = useState(null)
-  const throttleTimerRef = useRef(null)
-  const latestParamsRef = useRef({ studyId: null, dateRange: [null, null], topSpecies: [] })
 
   // Get taxonomic data from studyData
   const taxonomicData = studyData?.taxonomic || null
-
-  // True throttle implementation
-  const throttle = (func, limit) => {
-    let lastRun = 0
-    return function (...args) {
-      const now = Date.now()
-      if (now - lastRun >= limit) {
-        lastRun = now
-        func.apply(this, args)
-      }
-    }
-  }
-
-  // Fetch heatmap data function
-  const fetchHeatmapData = useCallback(async () => {
-    const { studyId, dateRange, topSpecies } = latestParamsRef.current
-
-    if (!dateRange[0] || !dateRange[1] || topSpecies.length === 0 || !studyId) return
-
-    try {
-      setMapLoading(true)
-      const speciesNames = topSpecies.map((s) => s.scientificName)
-      const response = await window.api.getSpeciesHeatmapData(
-        studyId,
-        speciesNames,
-        dateRange[0].toISOString(),
-        dateRange[1].toISOString()
-      )
-
-      if (response.error) {
-        console.error('Error fetching heatmap data:', response.error)
-        return
-      }
-
-      setHeatmapData(response.data)
-
-      const allPoints = Object.values(response.data).flat()
-      if (allPoints.length > 0) {
-        // setMapCenter([allPoints[0].lat, allPoints[0].lng])
-        // setMapZoom(6)
-      }
-    } catch (err) {
-      console.error('Failed to fetch heatmap data:', err)
-    } finally {
-      setMapLoading(false)
-    }
-  }, [])
-
-  // Create a throttled version of the fetch function (500ms delay)
-  const throttledFetchHeatmapData = useCallback(throttle(fetchHeatmapData, 1000), [
-    fetchHeatmapData
-  ])
 
   useEffect(() => {
     async function fetchData() {
@@ -724,14 +722,16 @@ export default function Activity({ studyData, studyId }) {
           setError(response.error)
         } else {
           setTimeseriesData(response.data.timeseries)
-          setTopSpecies(response.data.topSpecies)
+          setAllSpecies(response.data.allSpecies)
+
+          // Default select the top 2 species
+          setSelectedSpecies(response.data.allSpecies.slice(0, 2))
         }
 
         if (speciesResponse.error) {
           console.error('Error fetching species distribution:', speciesResponse.error)
         } else {
           setSpeciesDistributionData(speciesResponse.data)
-          console.log('Species distribution data:', speciesResponse.data)
         }
       } catch (err) {
         setError(err.message || 'Failed to fetch activity data')
@@ -744,6 +744,28 @@ export default function Activity({ studyData, studyId }) {
       fetchData()
     }
   }, [actualStudyId])
+
+  useEffect(() => {
+    async function fetchTimeseriesData() {
+      if (!selectedSpecies.length || !actualStudyId) return
+
+      try {
+        const speciesNames = selectedSpecies.map((s) => s.scientificName)
+        const response = await window.api.getSpeciesTimeseries(actualStudyId, speciesNames)
+
+        if (response.error) {
+          console.error('Error fetching species timeseries:', response.error)
+          return
+        }
+
+        setTimeseriesData(response.data.timeseries)
+      } catch (err) {
+        console.error('Failed to fetch species timeseries:', err)
+      }
+    }
+
+    fetchTimeseriesData()
+  }, [selectedSpecies, actualStudyId])
 
   useEffect(() => {
     if (
@@ -764,25 +786,17 @@ export default function Activity({ studyData, studyId }) {
   }, [timeseriesData])
 
   useEffect(() => {
-    // Update the latest parameters ref
-    latestParamsRef.current = {
-      studyId: actualStudyId,
-      dateRange,
-      topSpecies
-    }
+    async function fetchHeatmapData() {
+      if (!selectedSpecies.length || !dateRange[0] || !dateRange[1]) return
 
-    async function fetchData() {
-      // Trigger the throttled fetch
-      // throttledFetchHeatmapData()
-
-      // fetchHeatmapData()
-
-      const speciesNames = topSpecies.map((s) => s.scientificName)
+      const speciesNames = selectedSpecies.map((s) => s.scientificName)
       const response = await window.api.getSpeciesHeatmapData(
         studyId,
         speciesNames,
         dateRange[0].toISOString(),
-        dateRange[1].toISOString()
+        dateRange[1].toISOString(),
+        timeRange.start,
+        timeRange.end
       )
 
       if (response.error) {
@@ -791,33 +805,24 @@ export default function Activity({ studyData, studyId }) {
       }
 
       setHeatmapData(response.data)
-      console.log('Heatmap data:', response.data)
     }
 
-    fetchData()
+    fetchHeatmapData()
+  }, [dateRange, timeRange, selectedSpecies, actualStudyId, studyId])
 
-    // Cleanup function to cancel any pending throttled calls when component unmounts
-    return () => {
-      if (throttleTimerRef.current) {
-        clearTimeout(throttleTimerRef.current)
-      }
+  // Handle time range changes
+  const handleTimeRangeChange = useCallback((newTimeRange) => {
+    setTimeRange(newTimeRange)
+  }, [])
+
+  // Handle species selection changes
+  const handleSpeciesChange = useCallback((newSelectedSpecies) => {
+    // Ensure we have at least one species selected
+    if (newSelectedSpecies.length === 0) {
+      return
     }
-  }, [dateRange, topSpecies, actualStudyId, studyId, throttledFetchHeatmapData])
-
-  const filteredTimeseriesData =
-    timeseriesData && dateRange[0] && dateRange[1]
-      ? timeseriesData.filter((day) => {
-          const dayDate = new Date(day.date)
-          return dayDate >= dateRange[0] && dayDate <= dateRange[1]
-        })
-      : []
-
-  const filteredTopSpecies = topSpecies.map((species) => {
-    const count = filteredTimeseriesData.reduce((sum, day) => {
-      return sum + (day[species.scientificName] || 0)
-    }, 0)
-    return { ...species, filteredCount: count }
-  })
+    setSelectedSpecies(newSelectedSpecies)
+  }, [])
 
   return (
     <div className="px-4 pb-4 flex flex-col h-[calc(100vh-4rem)]">
@@ -832,24 +837,51 @@ export default function Activity({ studyData, studyId }) {
           {/* First row - takes remaining space */}
           <div className="flex flex-row gap-4 flex-1 min-h-0">
             {/* Species Distribution - left side */}
-            <div className="h-full overflow-auto w-xs">
-              <SpeciesDistribution data={speciesDistributionData} taxonomicData={taxonomicData} />
-            </div>
 
             {/* Map - right side */}
             <div className="h-full flex-1">
-              {heatmapData && <SpeciesMap heatmapData={heatmapData} topSpecies={topSpecies} />}
+              {heatmapData && (
+                <SpeciesMap
+                  heatmapData={heatmapData}
+                  selectedSpecies={selectedSpecies}
+                  palette={palette}
+                />
+              )}
+            </div>
+            <div className="h-full overflow-auto w-xs">
+              <SpeciesDistribution
+                data={speciesDistributionData}
+                taxonomicData={taxonomicData}
+                selectedSpecies={selectedSpecies}
+                onSpeciesChange={handleSpeciesChange}
+                palette={palette}
+              />
             </div>
           </div>
 
-          {/* Second row - fixed height with timeline */}
-          <div className="w-full flex h-[140px] rounded px-2 border border-gray-200 flex-shrink-0">
-            <TimelineChart
-              timeseriesData={timeseriesData}
-              topSpecies={topSpecies}
-              dateRange={dateRange}
-              setDateRange={setDateRange}
-            />
+          {/* Second row - fixed height with timeline and clock */}
+          <div className="w-full flex h-[130px] flex-shrink-0 gap-3">
+            <div className="w-[140px] rounded border border-gray-200 flex items-center justify-center">
+              <div>
+                <CircularTimeFilter
+                  onChange={handleTimeRangeChange}
+                  startTime={timeRange.start}
+                  endTime={timeRange.end}
+                />
+                <div className="text-xs text-center mt-1">
+                  {Math.floor(timeRange.start)}:00 - {Math.floor(timeRange.end)}:00
+                </div>
+              </div>
+            </div>
+            <div className="flex-grow rounded px-2 border border-gray-200">
+              <TimelineChart
+                timeseriesData={timeseriesData}
+                selectedSpecies={selectedSpecies}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                palette={palette}
+              />
+            </div>
           </div>
         </div>
       )}
