@@ -1,260 +1,311 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, use } from 'react'
 import { useParams } from 'react-router'
 import { MapContainer, TileLayer, LayersControl, Marker, Popup } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import CircularTimeFilter from './clock'
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Rectangle,
+  Customized
+} from 'recharts'
 
-// TimelineChart component
+// TimelineChart component using Recharts
 const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRange, palette }) => {
-  const svgRef = useRef(null)
-  const containerRef = useRef(null)
-  const dragRef = useRef({
-    isDragging: false,
-    initialX: 0,
-    initialRange: [null, null]
-  })
+  const draggingRef = useRef(false)
+  const resizingRef = useRef(null) // null, 'left', or 'right'
+  const dragStartXRef = useRef(null)
+  const initialRangeRef = useRef(null)
+  const chartRef = useRef(null)
 
-  // SVG dimensions and settings
-  const svgHeight = 100
-  const svgWidth = 800 // Fixed reference width for the viewBox
-  const width = svgWidth
-  const height = svgHeight
-  const xAxisHeight = 20 // Space for x-axis and labels
-  const topPadding = 0 // Small padding at the top for visual clarity
+  console.log('dragging', draggingRef.current)
 
-  const handleRangeMouseDown = (event) => {
-    if (!timeseriesData || timeseriesData.length === 0) return
-    event.preventDefault()
+  // Format data for Recharts
+  const formatData = useCallback(() => {
+    if (!timeseriesData) return []
 
-    // Save initial drag position and date range
-    dragRef.current = {
-      isDragging: true,
-      initialX: event.clientX,
-      initialRange: [...dateRange]
+    return timeseriesData.map((day) => {
+      const item = {
+        date: new Date(day.date),
+        displayDate: new Date(day.date).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: '2-digit'
+        })
+      }
+
+      // Add data for each selected species
+      selectedSpecies.forEach((species) => {
+        item[species.scientificName] = day[species.scientificName] || 0
+      })
+
+      return item
+    })
+  }, [timeseriesData, selectedSpecies])
+
+  const data = formatData()
+
+  // Custom component for the selection rectangle
+  const SelectionRangeRectangle = (props) => {
+    const { chartWidth, width, height, margin, xAxisMap, formattedGraphicalItems } = props
+
+    if (!dateRange[0] || !dateRange[1] || !data || data.length === 0 || !xAxisMap) {
+      console.log('No date range or data available')
+      return null
     }
 
-    document.addEventListener('mousemove', handleRangeDrag)
-    document.addEventListener(
-      'mouseup',
-      () => {
-        dragRef.current.isDragging = false
-        document.removeEventListener('mousemove', handleRangeDrag)
-      },
-      { once: true }
+    // Use the xAxisMap scale function directly with actual Date objects
+    const scale = xAxisMap ? xAxisMap[0].scale : null
+
+    if (!scale) {
+      console.log('No scale function available')
+      return null
+    }
+
+    // Get the x positions using the scale function from xAxisMap with actual Date objects
+    const x1 = scale(dateRange[0])
+    const x2 = scale(dateRange[1])
+
+    console.log('RECT positions', x1, x2, 'for dates', dateRange[0], dateRange[1])
+
+    // Handle edge cases
+    if (isNaN(x1) || isNaN(x2)) {
+      console.log('Invalid x positions')
+      return null
+    }
+
+    // Calculate width and get available height
+    const rectWidth = Math.abs(x2 - x1)
+    const rectHeight = height - margin.top - margin.bottom
+
+    const handleMouseDown = (e, type) => {
+      e.stopPropagation()
+      e.preventDefault()
+
+      if (type === 'move') {
+        draggingRef.current = true
+      } else {
+        resizingRef.current = type
+      }
+
+      dragStartXRef.current = e.clientX
+      initialRangeRef.current = [...dateRange]
+
+      // Add global event listeners
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+    }
+
+    console.log('rect', x1, x2, rectWidth, rectHeight)
+
+    return (
+      <g>
+        {/* Main selection rectangle */}
+        <Rectangle
+          x={x1}
+          y={margin.top}
+          width={rectWidth}
+          height={rectHeight}
+          fill="rgba(0, 0, 255, 0.1)"
+          stroke="rgba(0, 0, 255, 0.5)"
+          onMouseDown={(e) => handleMouseDown(e, 'move')}
+          style={{ cursor: 'move' }}
+        />
+
+        {/* Left resize handle */}
+        <Rectangle
+          x={x1}
+          y={margin.top}
+          width={5}
+          height={rectHeight}
+          fill="rgba(0, 0, 255, 0.2)"
+          stroke="rgba(0, 0, 255, 0.7)"
+          onMouseDown={(e) => handleMouseDown(e, 'left')}
+          style={{ cursor: 'ew-resize' }}
+        />
+
+        {/* Right resize handle */}
+        <Rectangle
+          x={x1 + rectWidth - 5}
+          y={margin.top}
+          width={5}
+          height={rectHeight}
+          fill="rgba(0, 0, 255, 0.2)"
+          stroke="rgba(0, 0, 255, 0.7)"
+          onMouseDown={(e) => handleMouseDown(e, 'right')}
+          style={{ cursor: 'ew-resize' }}
+        />
+      </g>
     )
   }
 
-  const handleRangeDrag = (event) => {
-    if (!timeseriesData || timeseriesData.length === 0 || !dragRef.current.isDragging) return
+  const handleMouseMove = useCallback(
+    (e) => {
+      console.log('MOUSE MOVE', draggingRef.current, resizingRef.current, e.clientX)
+      if (!draggingRef.current && !resizingRef.current) return
+      console.log('Range', initialRangeRef.current, dragStartXRef.current, chartRef.current)
+      if (!initialRangeRef.current || dragStartXRef.current === null || !chartRef.current) return
 
-    const svgRect = svgRef.current.getBoundingClientRect()
-    const totalWidth = svgRect.width
-    const startDate = new Date(timeseriesData[0].date)
-    const endDate = new Date(timeseriesData[timeseriesData.length - 1].date)
-    const totalTimeRange = endDate.getTime() - startDate.getTime()
+      const chartElement = chartRef.current
+      console.log('CHART', chartElement)
+      if (!chartElement) return
 
-    const deltaX = event.clientX - dragRef.current.initialX
-    const dateDelta = (deltaX / totalWidth) * totalTimeRange
+      console.log('client', e.clientX)
 
-    const newStart = new Date(dragRef.current.initialRange[0].getTime() + dateDelta)
-    const newEnd = new Date(dragRef.current.initialRange[1].getTime() + dateDelta)
+      const chartRect = chartElement.getBoundingClientRect()
+      const deltaX = e.clientX - dragStartXRef.current
+      const percentDelta = deltaX / chartRect.width
 
-    if (newStart >= startDate && newEnd <= endDate) {
-      setDateRange([newStart, newEnd])
-    } else if (newStart < startDate) {
-      const rangeDuration =
-        dragRef.current.initialRange[1].getTime() - dragRef.current.initialRange[0].getTime()
-      setDateRange([startDate, new Date(startDate.getTime() + rangeDuration)])
-    } else if (newEnd > endDate) {
-      const rangeDuration =
-        dragRef.current.initialRange[1].getTime() - dragRef.current.initialRange[0].getTime()
-      setDateRange([new Date(endDate.getTime() - rangeDuration), endDate])
-    }
-  }
+      console.log('DELTA', deltaX, percentDelta)
 
-  const handleRangeResize = (event, isLeftHandle) => {
-    if (!timeseriesData || timeseriesData.length === 0) return
+      // Calculate how many days that represents
+      const timeRange = data[data.length - 1].date.getTime() - data[0].date.getTime()
+      const daysDelta = Math.round((percentDelta * timeRange) / (24 * 60 * 60 * 1000))
 
-    const svgRect = svgRef.current.getBoundingClientRect()
-    const x = event.clientX - svgRect.left
-    const totalWidth = svgRect.width
-    const startDate = new Date(timeseriesData[0].date)
-    const endDate = new Date(timeseriesData[timeseriesData.length - 1].date)
+      let newStartDate, newEndDate
 
-    const newDate = new Date(
-      startDate.getTime() + ((endDate.getTime() - startDate.getTime()) * x) / totalWidth
-    )
+      if (draggingRef.current) {
+        // Move the entire selection
+        newStartDate = new Date(
+          initialRangeRef.current[0].getTime() + daysDelta * 24 * 60 * 60 * 1000
+        )
+        newEndDate = new Date(
+          initialRangeRef.current[1].getTime() + daysDelta * 24 * 60 * 60 * 1000
+        )
 
-    if (isLeftHandle && newDate < dateRange[1] && newDate >= startDate) {
-      setDateRange([newDate, dateRange[1]])
-    } else if (!isLeftHandle && newDate > dateRange[0] && newDate <= endDate) {
-      setDateRange([dateRange[0], newDate])
-    }
-  }
+        console.log('NEW START', newStartDate)
+        console.log('NEW END', newEndDate)
 
-  const handleMouseUp = (resizeHandler) => {
-    document.removeEventListener('mousemove', resizeHandler)
+        // Make sure we don't go out of bounds
+        if (newStartDate < data[0].date) {
+          const adjustment = data[0].date.getTime() - newStartDate.getTime()
+          newStartDate = new Date(data[0].date)
+          newEndDate = new Date(newEndDate.getTime() + adjustment)
+        }
+
+        if (newEndDate > data[data.length - 1].date) {
+          const adjustment = newEndDate.getTime() - data[data.length - 1].date.getTime()
+          newEndDate = new Date(data[data.length - 1].date)
+          newStartDate = new Date(newStartDate.getTime() - adjustment)
+        }
+      } else if (resizingRef.current === 'left') {
+        // Resize from the left side
+        newStartDate = new Date(
+          initialRangeRef.current[0].getTime() + daysDelta * 24 * 60 * 60 * 1000
+        )
+        newEndDate = initialRangeRef.current[1]
+
+        // Make sure start doesn't go beyond end or start of data
+        newStartDate = new Date(
+          Math.max(
+            data[0].date.getTime(),
+            Math.min(
+              newStartDate.getTime(),
+              initialRangeRef.current[1].getTime() - 24 * 60 * 60 * 1000
+            )
+          )
+        )
+      } else if (resizingRef.current === 'right') {
+        // Resize from the right side
+        newStartDate = initialRangeRef.current[0]
+        newEndDate = new Date(
+          initialRangeRef.current[1].getTime() + daysDelta * 24 * 60 * 60 * 1000
+        )
+
+        // Make sure end doesn't go before start or beyond end of data
+        newEndDate = new Date(
+          Math.min(
+            data[data.length - 1].date.getTime(),
+            Math.max(
+              newEndDate.getTime(),
+              initialRangeRef.current[0].getTime() + 24 * 60 * 60 * 1000
+            )
+          )
+        )
+      }
+
+      console.log('NEW DATES', newStartDate, newEndDate)
+
+      setDateRange([newStartDate, newEndDate])
+    },
+    [data, setDateRange]
+  )
+
+  const handleMouseUp = useCallback(() => {
+    draggingRef.current = false
+    resizingRef.current = null
+    dragStartXRef.current = null
+    initialRangeRef.current = null
+
+    // Remove global event listeners
+    document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
-  }
+  }, [handleMouseMove])
 
-  const generateLinePath = (speciesName) => {
-    if (!timeseriesData || timeseriesData.length === 0) return ''
-
-    const maxValue = Math.max(
-      ...timeseriesData.map((day) =>
-        Math.max(...selectedSpecies.map((s) => day[s.scientificName] || 0))
+  // Custom tooltip to show multiple species values
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-2 border border-gray-200 shadow-md rounded text-xs">
+          <p className="font-semibold">{label.toISOString()}</p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ color: entry.color }}>
+              {entry.name}: {entry.value}
+            </p>
+          ))}
+        </div>
       )
-    )
-
-    const xScale = width / Math.max(timeseriesData.length - 1, 1)
-    const yScale = (height - xAxisHeight - topPadding) / (maxValue || 1)
-
-    const points = timeseriesData.map((day, i) => ({
-      x: i * xScale,
-      y: height - xAxisHeight - (day[speciesName] || 0) * yScale
-    }))
-
-    let path = `M ${points[0].x},${points[0].y}`
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const current = points[i]
-      const next = points[i + 1]
-
-      const ctrlPointX1 = current.x + (next.x - current.x) * 0.3
-      const ctrlPointY1 = current.y
-      const ctrlPointX2 = next.x - (next.x - current.x) * 0.3
-      const ctrlPointY2 = next.y
-
-      path += ` C ${ctrlPointX1},${ctrlPointY1} ${ctrlPointX2},${ctrlPointY2} ${next.x},${next.y}`
     }
-
-    return path
+    return null
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col">
-      <svg
-        ref={svgRef}
-        width="100%"
-        height="100%"
-        className="bg-white rounded flex-grow"
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-      >
-        <line x1="0" y1={height - xAxisHeight} x2={width} y2={height - xAxisHeight} stroke="#999" />
-
-        {timeseriesData &&
-          timeseriesData
-            .filter(
-              (_, i) =>
-                i % Math.ceil(timeseriesData.length / 5) === 0 ||
-                i === 0 ||
-                i === timeseriesData.length - 1
-            )
-            .map((day, i) => (
-              <text
-                key={i}
-                x={
-                  ((i * (timeseriesData.length / 5)) / (timeseriesData.length - 1)) * (width - 40) +
-                  20
-                }
-                y={height - 5}
-                textAnchor="middle"
-                fontSize="8"
-                fontFamily="Inter"
-                fill="#777"
-              >
-                {new Date(day.date).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: '2-digit'
-                })}
-              </text>
-            ))}
-
-        {selectedSpecies.map((species, index) => (
-          <path
-            key={species.scientificName}
-            d={generateLinePath(species.scientificName)}
-            fill="none"
-            stroke={palette[index % palette.length]}
-            strokeWidth="2"
-            opacity="0.7"
-          />
-        ))}
-
-        {dateRange[0] && dateRange[1] && timeseriesData.length > 0 && (
-          <rect
-            x={
-              ((dateRange[0] - new Date(timeseriesData[0].date)) /
-                (new Date(timeseriesData[timeseriesData.length - 1].date) -
-                  new Date(timeseriesData[0].date))) *
-              svgWidth
-            }
-            y="0"
-            width={
-              ((dateRange[1] - dateRange[0]) /
-                (new Date(timeseriesData[timeseriesData.length - 1].date) -
-                  new Date(timeseriesData[0].date))) *
-              svgWidth
-            }
-            height={svgHeight}
-            fill="rgba(0, 0, 255, 0.2)"
-            cursor="move"
-            onMouseDown={handleRangeMouseDown}
-          />
-        )}
-
-        {dateRange[0] && timeseriesData.length > 0 && (
-          <rect
-            x={
-              ((dateRange[0] - new Date(timeseriesData[0].date)) /
-                (new Date(timeseriesData[timeseriesData.length - 1].date) -
-                  new Date(timeseriesData[0].date))) *
-              svgWidth
-            }
-            y="0"
-            width="5"
-            height={svgHeight}
-            fill="rgba(0, 0, 255, 0.5)"
-            cursor="ew-resize"
-            onMouseDown={(e) => {
-              e.preventDefault()
-              const resizeHandler = (event) => handleRangeResize(event, true)
-              document.addEventListener('mousemove', resizeHandler)
-              document.addEventListener('mouseup', () => handleMouseUp(resizeHandler), {
-                once: true
+    <div className="w-full h-full">
+      <ResponsiveContainer width="100%" height="100%" ref={chartRef}>
+        <LineChart data={data} margin={{ top: 0, right: 4, bottom: 0, left: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="date"
+            type="category"
+            scale="time"
+            domain={['dataMin', 'dataMax']}
+            tick={{ fontSize: 10 }}
+            tickFormatter={(date) => {
+              return date.toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: '2-digit'
               })
             }}
+            interval="preserveStartEnd"
+            minTickGap={50}
+            height={25}
           />
-        )}
+          <YAxis hide={true} />
+          {/* <Tooltip content={<CustomTooltip />} /> */}
 
-        {dateRange[1] && timeseriesData.length > 0 && (
-          <rect
-            x={
-              ((dateRange[1] - new Date(timeseriesData[0].date)) /
-                (new Date(timeseriesData[timeseriesData.length - 1].date) -
-                  new Date(timeseriesData[0].date))) *
-                svgWidth -
-              5
-            }
-            y="0"
-            width="5"
-            height={svgHeight}
-            fill="rgba(0, 0, 255, 0.5)"
-            cursor="ew-resize"
-            onMouseDown={(e) => {
-              e.preventDefault()
-              const resizeHandler = (event) => handleRangeResize(event, false)
-              document.addEventListener('mousemove', resizeHandler)
-              document.addEventListener('mouseup', () => handleMouseUp(resizeHandler), {
-                once: true
-              })
-            }}
-          />
-        )}
-      </svg>
+          {selectedSpecies.map((species, index) => (
+            <Line
+              key={species.scientificName}
+              type="monotone"
+              dataKey={species.scientificName}
+              stroke={palette[index % palette.length]}
+              dot={false}
+              activeDot={{ r: 5 }}
+              name={species.scientificName}
+            />
+          ))}
+
+          <Customized component={SelectionRangeRectangle} />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   )
 }
