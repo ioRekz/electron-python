@@ -493,16 +493,16 @@ const DailyActivityRadar = ({ activityData, selectedSpecies, palette, timeRangez
       <div className="relative w-full h-full" ref={chartRef}>
         {/* Hour labels with hardcoded positions */}
         <div className="absolute w-full h-full pointer-events-none">
-          <div className="absolute top-0.5 left-1/2 transform -translate-x-1/2  text-[10px] text-gray-400">
+          <div className="absolute top-0.5 left-1/2 transform -translate-x-1/2  text-[10px] text-gray-500">
             0h
           </div>
-          <div className="absolute top-1/2 right-1 transform -translate-y-1/2 text-[10px] text-gray-400">
+          <div className="absolute top-1/2 right-1 transform -translate-y-1/2 text-[10px] text-gray-500">
             6h
           </div>
-          <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 text-[10px] text-gray-400">
+          <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 text-[10px] text-gray-500">
             12h
           </div>
-          <div className="absolute top-1/2 left-0.5 transform  -translate-y-1/2 text-[10px] text-gray-400">
+          <div className="absolute top-1/2 left-0.5 transform  -translate-y-1/2 text-[10px] text-gray-500">
             18h
           </div>
         </div>

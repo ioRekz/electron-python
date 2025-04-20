@@ -119,6 +119,10 @@ export default function Media({ studyId, path }) {
   )
 
   const constructImageUrl = (fullFilePath) => {
+    console.log('fullFilePath', fullFilePath)
+    if (fullFilePath.startsWith('http')) {
+      return fullFilePath
+    }
     const filePathParts = fullFilePath.split('/')
     const filePath = filePathParts.slice(1).join('/')
     const fullPath = `${path}/${filePath}`
