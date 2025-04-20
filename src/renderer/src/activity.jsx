@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis
 } from 'recharts'
-import CircularTimeFilter from './clock'
+import CircularTimeFilter, { DailyActivityRadar } from './clock'
 
 // TimelineChart component using Recharts
 const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRange, palette }) => {
@@ -282,6 +282,8 @@ const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRang
               dot={false}
               activeDot={{ r: 5 }}
               name={species.scientificName}
+              fillOpacity={0.2}
+              fill={palette[index % palette.length]}
             />
           ))}
 
@@ -293,11 +295,11 @@ const TimelineChart = ({ timeseriesData, selectedSpecies, dateRange, setDateRang
 }
 
 // SpeciesMap component
-const SpeciesMap = ({ heatmapData, selectedSpecies, palette }) => {
+const SpeciesMap = ({ heatmapData, selectedSpecies, palette, geoKey }) => {
   // Function to create a pie chart icon
   const createPieChartIcon = (counts) => {
     const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
-    const size = Math.min(50, Math.max(20, Math.sqrt(total) * 3)) // Scale dot size based on count
+    const size = Math.min(60, Math.max(10, Math.sqrt(total) * 3)) // Scale dot size based on count
 
     const createSVG = () => {
       // Create SVG for pie chart
@@ -467,7 +469,7 @@ const SpeciesMap = ({ heatmapData, selectedSpecies, palette }) => {
 
         <LayersControl.Overlay name="Species Distribution" checked={true}>
           <MarkerClusterGroup
-            key={selectedSpecies.map((s) => s.scientificName).join(',')}
+            key={geoKey}
             chunkedLoading
             showCoverageOnHover={false}
             spiderfyOnEveryZoom={false}
@@ -738,6 +740,7 @@ export default function Activity({ studyData, studyId }) {
   const [timeseriesData, setTimeseriesData] = useState(null)
   const [heatmapData, setHeatmapData] = useState(null)
   const [speciesDistributionData, setSpeciesDistributionData] = useState(null)
+  const [dailyActivityData, setDailyActivityData] = useState(null)
 
   // Get taxonomic data from studyData
   const taxonomicData = studyData?.taxonomic || null
@@ -841,6 +844,33 @@ export default function Activity({ studyData, studyId }) {
     fetchHeatmapData()
   }, [dateRange, timeRange, selectedSpecies, actualStudyId, studyId])
 
+  useEffect(() => {
+    async function fetchDailyActivityData() {
+      if (!selectedSpecies.length || !dateRange[0] || !dateRange[1]) return
+
+      try {
+        const speciesNames = selectedSpecies.map((s) => s.scientificName)
+        const response = await window.api.getSpeciesDailyActivity(
+          actualStudyId,
+          speciesNames,
+          dateRange[0].toISOString(),
+          dateRange[1].toISOString()
+        )
+
+        if (response.error) {
+          console.error('Error fetching daily activity data:', response.error)
+          return
+        }
+
+        setDailyActivityData(response.data)
+      } catch (err) {
+        console.error('Failed to fetch daily activity data:', err)
+      }
+    }
+
+    fetchDailyActivityData()
+  }, [dateRange, selectedSpecies, actualStudyId])
+
   // Handle time range changes
   const handleTimeRangeChange = useCallback((newTimeRange) => {
     setTimeRange(newTimeRange)
@@ -876,6 +906,7 @@ export default function Activity({ studyData, studyId }) {
                   heatmapData={heatmapData}
                   selectedSpecies={selectedSpecies}
                   palette={palette}
+                  geoKey={selectedSpecies + ' ' + dateRange + ' ' + timeRange}
                 />
               )}
             </div>
@@ -892,16 +923,20 @@ export default function Activity({ studyData, studyId }) {
 
           {/* Second row - fixed height with timeline and clock */}
           <div className="w-full flex h-[130px] flex-shrink-0 gap-3">
-            <div className="w-[140px] rounded border border-gray-200 flex items-center justify-center">
-              <div>
+            <div className="w-[140px] h-full rounded border border-gray-200 flex items-center justify-center relative">
+              <DailyActivityRadar
+                activityData={dailyActivityData}
+                selectedSpecies={selectedSpecies}
+                palette={palette}
+                timeRange={timeRange}
+                onChange={handleTimeRangeChange}
+              />
+              <div className="absolute w-full h-full flex items-center justify-center">
                 <CircularTimeFilter
                   onChange={handleTimeRangeChange}
                   startTime={timeRange.start}
                   endTime={timeRange.end}
                 />
-                <div className="text-xs text-center mt-1">
-                  {Math.floor(timeRange.start)}:00 - {Math.floor(timeRange.end)}:00
-                </div>
               </div>
             </div>
             <div className="flex-grow rounded px-2 border border-gray-200">

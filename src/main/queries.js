@@ -806,6 +806,73 @@ export async function getLatestMedia(dbPath, limit = 10) {
   })
 }
 
+/**
+ * Get hourly activity data for species
+ * @param {string} dbPath - Path to the SQLite database
+ * @param {Array<string>} species - List of scientific names to include
+ * @param {string} startDate - ISO date string for range start
+ * @param {string} endDate - ISO date string for range end
+ * @returns {Promise<Object>} - Hourly activity data for specified species
+ */
+export async function getSpeciesDailyActivity(dbPath, species, startDate, endDate) {
+  return new Promise((resolve, reject) => {
+    log.info(`Querying species daily activity from: ${dbPath}`)
+    log.info(`Date range: ${startDate} to ${endDate}`)
+    log.info(`Species: ${species.join(', ')}`)
+
+    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
+      if (err) {
+        log.error(`Error opening database: ${err.message}`)
+        return reject(err)
+      }
+
+      // Extract species names for the IN clause with proper escaping
+      const speciesNames = species.map((s) => `'${s.replace(/'/g, "''")}'`).join(',')
+
+      // Query to get observation counts by hour and species
+      const query = `
+        SELECT
+          CAST(strftime('%H', eventStart) AS INTEGER) as hour,
+          scientificName,
+          COUNT(*) as count
+        FROM observations
+        WHERE
+          scientificName IN (${speciesNames})
+          AND eventStart >= ?
+          AND eventStart <= ?
+        GROUP BY hour, scientificName
+        ORDER BY hour, scientificName
+      `
+
+      db.all(query, [startDate, endDate], (err, rows) => {
+        db.close()
+
+        if (err) {
+          log.error(`Error querying species daily activity data: ${err.message}`)
+          return reject(err)
+        }
+
+        // Process the data to create species-specific hourly patterns
+        const hourlyData = Array(24)
+          .fill()
+          .map((_, i) => ({
+            hour: i,
+            // Initialize with 0 for each species
+            ...Object.fromEntries(species.map((s) => [s, 0]))
+          }))
+
+        // Fill in the actual data from the query results
+        rows.forEach((row) => {
+          hourlyData[row.hour][row.scientificName] = row.count
+        })
+
+        log.info(`Retrieved daily activity data: ${rows.length} hour/species combinations`)
+        resolve(hourlyData)
+      })
+    })
+  })
+}
+
 // Helper function to process timeseries data from SQL query
 function processTimeseriesDataFromSql(rawData) {
   const resultMap = new Map()

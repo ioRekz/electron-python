@@ -28,7 +28,8 @@ import {
   getSpeciesTimeseries,
   getSpeciesHeatmapData,
   getLocationsActivity,
-  getLatestMedia
+  getLatestMedia,
+  getSpeciesDailyActivity
 } from './queries'
 import { autoUpdater } from 'electron-updater'
 
@@ -525,6 +526,22 @@ app.whenReady().then(async () => {
       return { data: activity }
     } catch (error) {
       log.error('Error getting locations activity:', error)
+      return { error: error.message }
+    }
+  })
+
+  ipcMain.handle('get-species-daily-activity', async (_, studyId, species, startDate, endDate) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const dailyActivity = await getSpeciesDailyActivity(dbPath, species, startDate, endDate)
+      return { data: dailyActivity }
+    } catch (error) {
+      log.error('Error getting species daily activity data:', error)
       return { error: error.message }
     }
   })
