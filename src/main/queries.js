@@ -459,12 +459,6 @@ export async function getTopSpeciesTimeseries(dbPath) {
           return resolve({ allSpecies: [], timeseries: [] })
         }
 
-        // Extract species names for the IN clause
-        const top2SpeciesNames = allSpecies
-          .slice(0, 2)
-          .map((s) => `'${s.scientificName.replace(/'/g, "''")}'`)
-          .join(',')
-
         // Query using recursive CTE to generate week series and join with observations
         const timeseriesQuery = `
           WITH date_range AS (

@@ -928,8 +928,6 @@ export default function Activity({ studyData, studyId }) {
                 activityData={dailyActivityData}
                 selectedSpecies={selectedSpecies}
                 palette={palette}
-                timeRange={timeRange}
-                onChange={handleTimeRangeChange}
               />
               <div className="absolute w-full h-full flex items-center justify-center">
                 <CircularTimeFilter

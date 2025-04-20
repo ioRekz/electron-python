@@ -1,6 +1,5 @@
 import { contextBridge, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { getLocationsActivity } from '../main/queries'
 
 // Custom APIs for renderer
 const api = {

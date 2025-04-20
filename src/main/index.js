@@ -612,7 +612,7 @@ app.whenReady().then(async () => {
       const dbPath = join(app.getPath('userData'), `${studyId}.db`)
 
       if (existsSync(dbPath)) {
-        fs.unlinkSync(dbPath)
+        unlinkSync(dbPath)
         log.info(`Successfully deleted database: ${dbPath}`)
         return { success: true }
       } else {
