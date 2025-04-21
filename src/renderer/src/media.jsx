@@ -203,7 +203,7 @@ export function Media({ studyId, path }) {
   )
 }
 
-function Gallery({ species, dateRange, timeRange }) {
+function Gallery({ species, dateRange, timeRange, onImageError }) {
   const [mediaFiles, setMediaFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -263,6 +263,7 @@ function Gallery({ species, dateRange, timeRange }) {
               src={constructImageUrl(media.filePath)}
               alt={media.fileName || `Media ${media.mediaID}`}
               className="object-cover w-full h-full"
+              onError={(e) => onImageError(media.filePath)}
             />
           </div>
           <div className="p-2">
@@ -287,6 +288,7 @@ export default function Activity({ studyData, studyId }) {
   const [timeseriesData, setTimeseriesData] = useState(null)
   const [speciesDistributionData, setSpeciesDistributionData] = useState(null)
   const [dailyActivityData, setDailyActivityData] = useState(null)
+  const [imageErrors, setImageErrors] = useState([])
 
   // Get taxonomic data from studyData
   const taxonomicData = studyData?.taxonomic || null
@@ -410,6 +412,23 @@ export default function Activity({ studyData, studyId }) {
     <div className="px-4 pb-4 flex flex-col h-[calc(100vh-70px)]">
       {error ? (
         <div className="text-red-500 py-4">Error: {error}</div>
+      ) : imageErrors.length > 3 ? (
+        <div className="flex items-center justify-center p-3 h-full">
+          <div className="border rounded p-4 border-gray-300 max-w-prose">
+            <h3 className="text-lg font-semibold mb-2">Could not load any media</h3>
+            <p>Media for this dataset are not available. </p>
+            <p>
+              They might not be public or can't be accessed locally (moved, deleted or never
+              downloaded files)
+            </p>
+            <p className="mt-2 mb-1">Here are examples of images we tried to load:</p>
+            <div className="flex flex-col gap-1 text-gray-500 text-sm">
+              {imageErrors.slice(0, 3).map((src, index) => (
+                <div key={index}>{src}</div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="flex flex-col h-full gap-4">
           {/* First row - takes remaining space */}
@@ -422,6 +441,7 @@ export default function Activity({ studyData, studyId }) {
                 species={selectedSpecies.map((s) => s.scientificName)}
                 dateRange={dateRange}
                 timeRange={timeRange}
+                onImageError={(src) => setImageErrors((prev) => [...prev, src])}
               />
             </div>
             <div className="h-full overflow-auto w-xs">
