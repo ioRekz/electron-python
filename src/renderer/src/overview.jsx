@@ -97,7 +97,6 @@ function DeploymentMap({ deployments }) {
 // Export SpeciesDistribution so it can be imported in activity.jsx
 function SpeciesDistribution({ data, taxonomicData }) {
   const [commonNames, setCommonNames] = useState({})
-  const [isLoadingNames, setIsLoadingNames] = useState(false)
 
   const totalCount = data.reduce((sum, item) => sum + item.count, 0)
 
@@ -167,7 +166,6 @@ function SpeciesDistribution({ data, taxonomicData }) {
 
       if (missingCommonNames.length === 0) return
 
-      setIsLoadingNames(true)
       const newCommonNames = { ...commonNames }
 
       // Fetch common names for species with missing common names
@@ -181,7 +179,6 @@ function SpeciesDistribution({ data, taxonomicData }) {
       )
 
       setCommonNames(newCommonNames)
-      setIsLoadingNames(false)
     }
 
     fetchMissingCommonNames()

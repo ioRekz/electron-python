@@ -6,7 +6,7 @@ import {
   ComboboxOptions,
   ComboboxOption
 } from '@headlessui/react'
-import { CheckIcon } from 'lucide-react'
+import { CheckIcon, CameraOff } from 'lucide-react'
 import { useParams } from 'react-router'
 import CircularTimeFilter, { DailyActivityRadar } from './ui/clock'
 import SpeciesDistribution from './ui/speciesDistribution'
@@ -203,10 +203,11 @@ export function Media({ studyId, path }) {
   )
 }
 
-function Gallery({ species, dateRange, timeRange, onImageError }) {
+function Gallery({ species, dateRange, timeRange }) {
   const [mediaFiles, setMediaFiles] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [, setLoading] = useState(true)
+  const [, setError] = useState(null)
+  const [imageErrors, setImageErrors] = useState({})
 
   const { id } = useParams()
 
@@ -252,19 +253,29 @@ function Gallery({ species, dateRange, timeRange, onImageError }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-[6px]  h-full overflow-auto">
+    <div className="flex flex-wrap gap-[12px]  h-full overflow-auto">
       {mediaFiles.map((media) => (
         <div
           key={media.mediaID}
-          className="border border-gray-300 rounded-lg overflow-hidden w-[calc(33%-2px)]"
+          className="border border-gray-300 rounded-lg overflow-hidden w-[calc(33%-6px)] flex flex-col"
         >
-          <div className="bg-gray-100 flex items-center justify-center">
+          <div className="flex-1 bg-gray-100 flex items-center justify-center">
             <img
               src={constructImageUrl(media.filePath)}
               alt={media.fileName || `Media ${media.mediaID}`}
-              className="object-cover w-full h-full"
-              onError={(e) => onImageError(media.filePath)}
+              className={`object-contain w-full h-auto ${imageErrors[media.mediaID] ? 'hidden' : ''}`}
+              onError={() => {
+                setImageErrors((prev) => ({ ...prev, [media.mediaID]: true }))
+              }}
             />
+            {imageErrors[media.mediaID] && (
+              <div
+                className="flex items-center justify-center w-full h-full bg-gray-100 text-gray-400"
+                title={`Image not available or failed to load because it's not public or has been deleted/moved locally ${media.filePath}`}
+              >
+                <CameraOff size={32} />
+              </div>
+            )}
           </div>
           <div className="p-2">
             <h3 className="text-sm font-semibold truncate">{media.scientificName}</h3>
@@ -280,7 +291,7 @@ export default function Activity({ studyData, studyId }) {
   const { id } = useParams()
   const actualStudyId = studyId || id // Use passed studyId or from params
 
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedSpecies, setSelectedSpecies] = useState([])
   const [dateRange, setDateRange] = useState([null, null])
@@ -288,7 +299,6 @@ export default function Activity({ studyData, studyId }) {
   const [timeseriesData, setTimeseriesData] = useState(null)
   const [speciesDistributionData, setSpeciesDistributionData] = useState(null)
   const [dailyActivityData, setDailyActivityData] = useState(null)
-  const [imageErrors, setImageErrors] = useState([])
 
   // Get taxonomic data from studyData
   const taxonomicData = studyData?.taxonomic || null
@@ -412,23 +422,6 @@ export default function Activity({ studyData, studyId }) {
     <div className="px-4 pb-4 flex flex-col h-[calc(100vh-70px)]">
       {error ? (
         <div className="text-red-500 py-4">Error: {error}</div>
-      ) : imageErrors.length > 3 ? (
-        <div className="flex items-center justify-center p-3 h-full">
-          <div className="border rounded p-4 border-gray-300 max-w-prose">
-            <h3 className="text-lg font-semibold mb-2">Could not load any media</h3>
-            <p>Media for this dataset are not available. </p>
-            <p>
-              They might not be public or can't be accessed locally (moved, deleted or never
-              downloaded files)
-            </p>
-            <p className="mt-2 mb-1">Here are examples of images we tried to load:</p>
-            <div className="flex flex-col gap-1 text-gray-500 text-sm">
-              {imageErrors.slice(0, 3).map((src, index) => (
-                <div key={index}>{src}</div>
-              ))}
-            </div>
-          </div>
-        </div>
       ) : (
         <div className="flex flex-col h-full gap-4">
           {/* First row - takes remaining space */}
@@ -441,7 +434,6 @@ export default function Activity({ studyData, studyId }) {
                 species={selectedSpecies.map((s) => s.scientificName)}
                 dateRange={dateRange}
                 timeRange={timeRange}
-                onImageError={(src) => setImageErrors((prev) => [...prev, src])}
               />
             </div>
             <div className="h-full overflow-auto w-xs">

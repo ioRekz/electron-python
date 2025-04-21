@@ -220,19 +220,19 @@ function AppContent() {
   return (
     <div className={`relative flex h-svh flex-row`}>
       <div className="w-52 h-full p-2 fixed">
-        <header className="p-2">
+        {/* <header className="p-2">
           <div className="text-base font-semibold p-2 flex items-center">
             <span className="pt-[3px]">Biowatch</span>
             <Camera color="black" size={24} className="rotate-[80deg]" />
           </div>
-        </header>
+        </header> */}
         <ul className="flex w-full min-w-0 flex-col gap-4 p-2">
           <li>
             <NavLink
               to="/import"
               className="flex w-full items-center h-8 gap-2 text-sm font-medium hover:bg-gray-100 rounded-md p-2"
             >
-              <span>Study</span>
+              <span>Studies</span>
             </NavLink>
             <ul className="border-l mx-3.5 border-gray-200 flex w-full flex-col gap-1 px-1.5 py-0.5 text-[hsl(var(--sidebar-foreground))]">
               {studies.map((study) => (
