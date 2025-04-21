@@ -68,7 +68,7 @@ jobs:
 
       - name: Install Node.js dependencies
         run: |
-          npm install
+          npm install --force
 
       - name: Build on MacOS
         env:
