@@ -3,6 +3,51 @@ import { HashRouter, NavLink, Route, Routes, useNavigate, useLocation } from 're
 import Import from './import'
 import Study from './study'
 import { useState, useEffect } from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
+
+function ErrorFallback({ error, resetErrorBoundary }) {
+  console.log('ErrorFallback', error.stack)
+
+  const copyErrorToClipboard = () => {
+    const errorDetails = `
+      Error: ${error.message}
+      Stack: ${error.stack}
+      Time: ${new Date().toISOString()}
+    `.trim()
+
+    navigator.clipboard
+      .writeText(errorDetails)
+
+      .catch((err) => {
+        console.error('Failed to copy error details:', err)
+      })
+  }
+
+  return (
+    <div className="p-4 bg-red-50 text-red-700 rounded-md m-4">
+      <h3 className="font-semibold mb-2">Something went wrong</h3>
+      <p className="text-sm mb-2">There was an error loading this content.</p>
+      <details className="text-xs bg-white p-2 rounded border border-red-200">
+        <summary>Error details</summary>
+        <pre className="mt-2 whitespace-pre-wrap">{error.message}</pre>
+      </details>
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={resetErrorBoundary}
+          className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded text-sm"
+        >
+          Try again
+        </button>
+        <button
+          onClick={copyErrorToClipboard}
+          className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded text-sm"
+        >
+          Copy error
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function AppContent() {
   const [studies, setStudies] = useState(JSON.parse(localStorage.getItem('studies')) || [])
@@ -75,10 +120,6 @@ function AppContent() {
   useEffect(() => {
     const handleDeleteStudy = async (event, studyId) => {
       try {
-        // Delete the database file through the main process
-        // await window.api.deleteStudyDatabase(studyId)
-
-        // Remove the study from localStorage
         console.log('Deleting study with ID:', studyId)
         const updatedStudies = studies.filter((s) => s.id !== studyId)
 
@@ -191,9 +232,7 @@ function AppContent() {
               to="/import"
               className="flex w-full items-center h-8 gap-2 text-sm font-medium hover:bg-gray-100 rounded-md p-2"
             >
-              {/* <NotebookPen color="black" size={20} className="pb-[2px]" /> */}
               <span>Study</span>
-              {/* <PlusCircle color="black" size={14} className="ml-auto" /> */}
             </NavLink>
             <ul className="border-l mx-3.5 border-gray-200 flex w-full flex-col gap-1 px-1.5 py-0.5 text-[hsl(var(--sidebar-foreground))]">
               {studies.map((study) => (
@@ -243,7 +282,9 @@ function AppContent() {
 export default function App() {
   return (
     <HashRouter>
-      <AppContent />
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <AppContent />
+      </ErrorBoundary>
     </HashRouter>
   )
 }
