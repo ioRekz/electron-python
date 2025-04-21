@@ -1,5 +1,6 @@
 appId: org.biowatch.app
 productName: Biowatch
+name: biowatch
 directories:
   buildResources: build
 files:
@@ -19,7 +20,7 @@ extraResources:
 asarUnpack:
   - resources/**
 win:
-  executableName: electron-python
+  executableName: Biowatch
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -42,6 +43,7 @@ linux:
     # - deb
   maintainer: electronjs.org
   category: Utility
+
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
