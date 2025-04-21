@@ -4,6 +4,7 @@ import { app } from 'electron'
 import sqlite3 from 'sqlite3'
 import csv from 'csv-parser'
 import log from 'electron-log'
+import { DateTime } from 'luxon'
 
 /**
  * Import CamTrapDP dataset from a directory into a SQLite database
@@ -193,7 +194,17 @@ function insertCSVData(db, filePath, tableName, columns) {
 
       try {
         stream.on('data', async (row) => {
-          const values = columns.map((col) => row[col])
+          const values = columns.map((col) => {
+            if (
+              ['eventStart', 'eventEnd', 'timestamp', 'deploymentStart', 'deploymentEnd'].includes(
+                col
+              )
+            ) {
+              const date = DateTime.fromISO(row[col])
+              return date.isValid ? date.toISO() : null
+            }
+            return row[col]
+          })
           try {
             await runQuery(db, insertSql, values)
             rowCount++

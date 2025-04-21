@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import ReactDOMServer from 'react-dom/server'
 import L from 'leaflet'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import { Camera, ChevronDown, ChevronUp } from 'lucide-react'
+import { Camera, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function DeploymentMap({ deployments }) {
   if (!deployments || deployments.length === 0) {
@@ -234,6 +234,9 @@ export default function Overview({ data, studyId }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  const contributorsRef = useRef(null)
 
   useEffect(() => {
     async function fetchData() {
@@ -270,12 +273,47 @@ export default function Overview({ data, studyId }) {
     fetchData()
   }, [studyId])
 
-  // Extract taxonomic data from the study data if available
-  const taxonomicData = data.taxonomic || null
+  // Check scroll possibility
+  useEffect(() => {
+    if (!contributorsRef.current) return
+
+    const checkScroll = () => {
+      const container = contributorsRef.current
+      setCanScrollLeft(container.scrollLeft > 0)
+      setCanScrollRight(container.scrollLeft < container.scrollWidth - container.clientWidth - 5)
+    }
+
+    const container = contributorsRef.current
+    container.addEventListener('scroll', checkScroll)
+    // Initial check
+    checkScroll()
+
+    // Check again if window resizes
+    window.addEventListener('resize', checkScroll)
+
+    return () => {
+      container?.removeEventListener('scroll', checkScroll)
+      window.removeEventListener('resize', checkScroll)
+    }
+  }, [data.contributors])
+
+  const scrollContributors = (direction) => {
+    if (!contributorsRef.current) return
+
+    const container = contributorsRef.current
+    const scrollAmount = container.clientWidth * 0.75 // Scroll by 75% of visible width
+
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    })
+  }
 
   const toggleDescription = () => {
     setIsDescriptionExpanded(!isDescriptionExpanded)
   }
+
+  const taxonomicData = data.taxonomic || null
 
   return (
     <div className="flex flex-col px-4 gap-4">
@@ -323,36 +361,78 @@ export default function Overview({ data, studyId }) {
       </header>
 
       {data.contributors && data.contributors.length > 0 && (
-        <div className="flex overflow-x-auto gap-4">
-          {data.contributors.map((contributor, index) => (
-            <div
-              key={index}
-              className="flex flex-col flex-shrink-0 w-64 p-4 border border-gray-200 rounded-md shadow-sm bg-white"
+        <div className="relative">
+          {/* Left scroll button */}
+          {canScrollLeft && (
+            <button
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 rounded-full p-1 shadow-md border border-gray-200"
+              onClick={() => scrollContributors('left')}
+              aria-label="Scroll left"
             >
-              <div className="">
-                {contributor.title || `${contributor.firstName} ${contributor.lastName}`}
-              </div>
-              <div className="text-sm text-gray-600">
-                {contributor.role &&
-                  contributor.role
-                    .replace(/([A-Z])/g, ' $1')
-                    .replace(/^./, (str) => str.toUpperCase())}
-              </div>
-              {contributor.organization && (
-                <div className="text-sm text-gray-500 mt-2 mb-2 line-clamp-2 overflow-hidden relative">
-                  {contributor.organization}
-                  <div className="absolute bottom-0 right-0 bg-gradient-to-l from-white to-transparent w-8 h-4"></div>
+              <ChevronLeft size={20} />
+            </button>
+          )}
+
+          {/* Right scroll button */}
+          {canScrollRight && (
+            <button
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 rounded-full p-1 shadow-md border border-gray-200"
+              onClick={() => scrollContributors('right')}
+              aria-label="Scroll right"
+            >
+              <ChevronRight size={20} />
+            </button>
+          )}
+
+          {/* Left fade effect */}
+          {canScrollLeft && (
+            <div className="absolute left-0 top-0 h-full w-12 bg-gradient-to-r from-white to-transparent z-[1] pointer-events-none"></div>
+          )}
+
+          {/* Right fade effect */}
+          {canScrollRight && (
+            <div className="absolute right-0 top-0 h-full w-12 bg-gradient-to-l from-white to-transparent z-[1] pointer-events-none"></div>
+          )}
+
+          <div
+            ref={contributorsRef}
+            className="flex overflow-x-auto gap-4 scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {data.contributors.map((contributor, index) => (
+              <div
+                key={index}
+                className="flex flex-col flex-shrink-0 w-64 p-4 border border-gray-200 rounded-md shadow-sm bg-white"
+              >
+                <div className="">
+                  {contributor.title || `${contributor.firstName} ${contributor.lastName}`}
                 </div>
-              )}
-              {contributor.email && (
-                <div className="text-sm text-blue-500 mt-2 truncate mt-auto">
-                  <a target="_blank" rel="noopener noreferrer" href={`mailto:${contributor.email}`}>
-                    {contributor.email}
-                  </a>
+                <div className="text-sm text-gray-600">
+                  {contributor.role &&
+                    contributor.role
+                      .replace(/([A-Z])/g, ' $1')
+                      .replace(/^./, (str) => str.toUpperCase())}
                 </div>
-              )}
-            </div>
-          ))}
+                {contributor.organization && (
+                  <div className="text-sm text-gray-500 mt-2 mb-2 line-clamp-2 overflow-hidden relative">
+                    {contributor.organization}
+                    <div className="absolute bottom-0 right-0 bg-gradient-to-l from-white to-transparent w-8 h-4"></div>
+                  </div>
+                )}
+                {contributor.email && (
+                  <div className="text-sm text-blue-500 mt-2 truncate mt-auto">
+                    <a
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      href={`mailto:${contributor.email}`}
+                    >
+                      {contributor.email}
+                    </a>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

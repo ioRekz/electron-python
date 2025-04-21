@@ -12,12 +12,12 @@ export default function Study() {
   console.log('S', study)
   return (
     <div className="flex gap-4 flex-col h-full">
-      <header className="w-full flex border-b border-gray-200 divide-gray-200 divide-x sticky top-0 bg-white z-10 rounded-tl-md rounded-tr-md">
+      <header className="w-full flex border-b border-gray-200 divide-gray-200 divide-x sticky top-0 bg-white z-10 rounded-tl-md rounded-tr-md [&>a:last-child]:rounded-tr-md [&>a:first-child]:rounded-tl-md">
         <NavLink
           to={`/study/${id}`}
           end
           className={({ isActive }) =>
-            `${isActive ? 'bg-gray-100' : ''} hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm rounded-tl-md`
+            `${isActive ? 'bg-gray-100' : ''} hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm`
           }
         >
           <NotebookText color="black" size={20} className="pb-[2px]" />
@@ -33,6 +33,15 @@ export default function Study() {
           Activity
         </NavLink>
         <NavLink
+          to={`/study/${id}/media`}
+          className={({ isActive }) =>
+            `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm`
+          }
+        >
+          <Image color="black" size={20} className="pb-[2px]" />
+          Media
+        </NavLink>
+        <NavLink
           to={`/study/${id}/deployments`}
           className={({ isActive }) =>
             `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm`
@@ -40,15 +49,6 @@ export default function Study() {
         >
           <Cctv color="black" size={20} className="pb-[2px]" />
           Deployments
-        </NavLink>
-        <NavLink
-          to={`/study/${id}/media`}
-          className={({ isActive }) =>
-            `${isActive ? 'bg-gray-100' : ''} cursor-pointer hover:bg-gray-100 transition-colors flex justify-center flex-row gap-2 items-center px-4 h-10 text-sm rounded-tr-md`
-          }
-        >
-          <Image color="black" size={20} className="pb-[2px]" />
-          Media
         </NavLink>
       </header>
       <div className="flex-1 overflow-y-auto h-full pb-4">

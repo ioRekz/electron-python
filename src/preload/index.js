@@ -63,6 +63,9 @@ const api = {
   getLatestMedia: async (studyId, limit = 10) => {
     return await electronAPI.ipcRenderer.invoke('get-latest-media', studyId, limit)
   },
+  getMedia: async (studyId, options = {}) => {
+    return await electronAPI.ipcRenderer.invoke('get-media', studyId, options)
+  },
   getSpeciesDailyActivity: async (studyId, species, startDate, endDate) => {
     return await electronAPI.ipcRenderer.invoke(
       'get-species-daily-activity',

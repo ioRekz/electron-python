@@ -28,7 +28,7 @@ import {
   getSpeciesTimeseries,
   getSpeciesHeatmapData,
   getLocationsActivity,
-  getLatestMedia,
+  getMedia,
   getSpeciesDailyActivity
 } from './queries'
 import { autoUpdater } from 'electron-updater'
@@ -625,7 +625,24 @@ app.whenReady().then(async () => {
     }
   })
 
-  // Add media handler
+  // Update media handler to use the new getMedia function with options
+  ipcMain.handle('get-media', async (_, studyId, options = {}) => {
+    try {
+      const dbPath = join(app.getPath('userData'), `${studyId}.db`)
+      if (!existsSync(dbPath)) {
+        log.warn(`Database not found for study ID: ${studyId}`)
+        return { error: 'Database not found for this study' }
+      }
+
+      const media = await getMedia(dbPath, options)
+      return { data: media }
+    } catch (error) {
+      log.error('Error getting media:', error)
+      return { error: error.message }
+    }
+  })
+
+  // Keep the old handler for backward compatibility, but implement it using the new function
   ipcMain.handle('get-latest-media', async (_, studyId, limit = 10) => {
     try {
       const dbPath = join(app.getPath('userData'), `${studyId}.db`)
@@ -634,7 +651,7 @@ app.whenReady().then(async () => {
         return { error: 'Database not found for this study' }
       }
 
-      const media = await getLatestMedia(dbPath, limit)
+      const media = await getMedia(dbPath, { limit })
       return { data: media }
     } catch (error) {
       log.error('Error getting latest media:', error)

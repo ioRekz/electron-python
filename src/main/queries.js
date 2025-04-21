@@ -750,14 +750,36 @@ export async function getSpeciesHeatmapData(
 }
 
 /**
- * Get the latest media files from the database that have animal observations
+ * Get media files from the database that have animal observations with optional filtering
  * @param {string} dbPath - Path to the SQLite database
- * @param {number} limit - Maximum number of media files to return
- * @returns {Promise<Array>} - Media files with filePath and mediaID that have animal observations
+ * @param {Object} options - Query options
+ * @param {number} options.limit - Maximum number of media files to return
+ * @param {Array<string>} options.species - List of species to filter by (optional)
+ * @param {Object} options.dateRange - Date range to filter by (optional)
+ * @param {string} options.dateRange.start - Start date (ISO string)
+ * @param {string} options.dateRange.end - End date (ISO string)
+ * @param {Object} options.timeRange - Time of day range to filter by (optional)
+ * @param {number} options.timeRange.start - Start hour (0-23)
+ * @param {number} options.timeRange.end - End hour (0-23)
+ * @returns {Promise<Array>} - Media files matching the criteria
  */
-export async function getLatestMedia(dbPath, limit = 10) {
+export async function getMedia(dbPath, options = {}) {
+  const { limit = 10, species = [], dateRange = {}, timeRange = {} } = options
+
   return new Promise((resolve, reject) => {
-    log.info(`Querying latest ${limit} media files with animal observations from: ${dbPath}`)
+    log.info(`Querying media files from: ${dbPath} with filtering options`)
+
+    if (species.length > 0) {
+      log.info(`Species filter: ${species.join(', ')}`)
+    }
+
+    if (dateRange.start && dateRange.end) {
+      log.info(`Date range: ${typeof dateRange.start} to ${dateRange.end}`)
+    }
+
+    if (timeRange.start !== undefined && timeRange.end !== undefined) {
+      log.info(`Time range: ${timeRange.start}:00 to ${timeRange.end}:00`)
+    }
 
     // Open the database
     const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
@@ -766,9 +788,8 @@ export async function getLatestMedia(dbPath, limit = 10) {
         return reject(err)
       }
 
-      // Query to get the latest media files with animal observations
-      // Joins media with observations based on matching timestamp and eventStart
-      const query = `
+      // Build the query with optional filters
+      let query = `
         SELECT DISTINCT
           m.mediaID,
           m.filePath,
@@ -779,12 +800,54 @@ export async function getLatestMedia(dbPath, limit = 10) {
         JOIN observations o ON m.timestamp = o.eventStart
         WHERE o.scientificName IS NOT NULL
           AND o.scientificName != ''
-          AND o.scientificName != 'Homo sapiens'
+
+      `
+
+      const queryParams = []
+
+      // Add species filter if provided
+      if (species.length > 0) {
+        const placeholders = species.map(() => '?').join(',')
+        query += ` AND o.scientificName IN (${placeholders})`
+        queryParams.push(...species)
+      }
+
+      // Add date range filter if provided
+      if (dateRange.start && dateRange.end) {
+        // Format Date objects to ISO strings if they're not already
+        const startDate =
+          dateRange.start instanceof Date ? dateRange.start.toISOString() : dateRange.start
+        const endDate = dateRange.end instanceof Date ? dateRange.end.toISOString() : dateRange.end
+
+        log.info(`Formatted date range: ${startDate} to ${endDate}`)
+
+        query += ` AND m.timestamp >= ? AND m.timestamp <= ?`
+        queryParams.push(startDate, endDate)
+      }
+
+      // // Add time of day filter if provided
+      if (timeRange.start !== undefined && timeRange.end !== undefined) {
+        if (timeRange.start < timeRange.end) {
+          // Simple range (e.g., 8:00 to 17:00)
+          query += ` AND CAST(strftime('%H', m.timestamp) AS INTEGER) >= ?
+                     AND CAST(strftime('%H', m.timestamp) AS INTEGER) < ?`
+          queryParams.push(timeRange.start, timeRange.end)
+        } else if (timeRange.start > timeRange.end) {
+          // Wrapping range (e.g., 22:00 to 6:00)
+          query += ` AND (CAST(strftime('%H', m.timestamp) AS INTEGER) >= ?
+                     OR CAST(strftime('%H', m.timestamp) AS INTEGER) < ?)`
+          queryParams.push(timeRange.start, timeRange.end)
+        }
+      }
+
+      // Add ordering and limit
+      query += `
         ORDER BY m.timestamp DESC
         LIMIT ?
       `
+      queryParams.push(limit)
 
-      db.all(query, [limit], (err, rows) => {
+      db.all(query, queryParams, (err, rows) => {
         // Close the database
         db.close()
 
@@ -793,7 +856,7 @@ export async function getLatestMedia(dbPath, limit = 10) {
           return reject(err)
         }
 
-        log.info(`Retrieved ${rows.length} media files with animal observations`)
+        log.info(`Retrieved ${rows.length} media files matching criteria`)
         resolve(rows)
       })
     })

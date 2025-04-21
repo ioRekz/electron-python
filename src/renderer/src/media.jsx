@@ -7,7 +7,18 @@ import {
   ComboboxOption
 } from '@headlessui/react'
 import { CheckIcon } from 'lucide-react'
-import CircularTimeFilter from './clock'
+import { useParams } from 'react-router'
+import CircularTimeFilter, { DailyActivityRadar } from './ui/clock'
+import SpeciesDistribution from './ui/speciesDistribution'
+import TimelineChart from './ui/timeseries'
+
+const palette = [
+  'hsl(173 58% 39%)',
+  'hsl(43 74% 66%)',
+  'hsl(12 76% 61%)',
+  'hsl(197 37% 24%)',
+  'hsl(27 87% 67%)'
+]
 
 // Add the SpeciesFilter component
 const SpeciesFilter = ({ speciesList, selectedSpecies, onChange }) => {
@@ -66,7 +77,7 @@ const SpeciesFilter = ({ speciesList, selectedSpecies, onChange }) => {
   )
 }
 
-export default function Media({ studyId, path }) {
+export function Media({ studyId, path }) {
   const [mediaFiles, setMediaFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState({ start: 0, end: 24 })
@@ -188,6 +199,272 @@ export default function Media({ studyId, path }) {
           ))
         )}
       </div>
+    </div>
+  )
+}
+
+function Gallery({ species, dateRange, timeRange }) {
+  const [mediaFiles, setMediaFiles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const { id } = useParams()
+
+  const study = JSON.parse(localStorage.getItem('studies')).find((study) => study.id === id)
+
+  useEffect(() => {
+    if (!dateRange[0] || !dateRange[1]) return
+    async function fetchMediaFiles() {
+      try {
+        console.log('Fetching media files for species:', species, dateRange, timeRange)
+        const response = await window.api.getMedia(id, {
+          species,
+          dateRange: { start: dateRange[0], end: dateRange[1] },
+          timeRange,
+          limit: 20
+        })
+        if (response.error) {
+          setError(response.error)
+        } else {
+          console.log('Fetched media filess:', response.data)
+          setMediaFiles(response.data)
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to fetch media files')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMediaFiles()
+  }, [dateRange, species, timeRange, id])
+
+  const constructImageUrl = (fullFilePath) => {
+    if (fullFilePath.startsWith('http')) {
+      return fullFilePath
+    }
+    const filePathParts = fullFilePath.split('/')
+    const filePath = filePathParts.slice(1).join('/')
+    const fullPath = `${study.path}/${filePath}`
+    const urlPath = fullPath.replace(/\\/g, '/')
+
+    return `local-file://get?path=${encodeURIComponent(urlPath)}`
+  }
+
+  return (
+    <div className="flex flex-wrap gap-[6px]  h-full overflow-auto">
+      {mediaFiles.map((media) => (
+        <div
+          key={media.mediaID}
+          className="border border-gray-300 rounded-lg overflow-hidden w-[calc(33%-2px)]"
+        >
+          <div className="bg-gray-100 flex items-center justify-center">
+            <img
+              src={constructImageUrl(media.filePath)}
+              alt={media.fileName || `Media ${media.mediaID}`}
+              className="object-cover w-full h-full"
+            />
+          </div>
+          <div className="p-2">
+            <h3 className="text-sm font-semibold truncate">{media.scientificName}</h3>
+            <p className="text-xs text-gray-500">{new Date(media.timestamp).toLocaleString()}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function Activity({ studyData, studyId }) {
+  const { id } = useParams()
+  const actualStudyId = studyId || id // Use passed studyId or from params
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [selectedSpecies, setSelectedSpecies] = useState([])
+  const [dateRange, setDateRange] = useState([null, null])
+  const [timeRange, setTimeRange] = useState({ start: 0, end: 24 })
+  const [timeseriesData, setTimeseriesData] = useState(null)
+  const [speciesDistributionData, setSpeciesDistributionData] = useState(null)
+  const [dailyActivityData, setDailyActivityData] = useState(null)
+
+  // Get taxonomic data from studyData
+  const taxonomicData = studyData?.taxonomic || null
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true)
+
+        const response = await window.api.getTopSpeciesTimeseries(actualStudyId)
+        const speciesResponse = await window.api.getSpeciesDistribution(actualStudyId)
+
+        if (response.error) {
+          setError(response.error)
+        } else {
+          setTimeseriesData(response.data.timeseries)
+
+          // Default select the top 2 species
+          setSelectedSpecies(response.data.allSpecies.slice(0, 2))
+        }
+
+        if (speciesResponse.error) {
+          console.error('Error fetching species distribution:', speciesResponse.error)
+        } else {
+          setSpeciesDistributionData(speciesResponse.data)
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to fetch activity data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (actualStudyId) {
+      fetchData()
+    }
+  }, [actualStudyId])
+
+  useEffect(() => {
+    async function fetchTimeseriesData() {
+      if (!selectedSpecies.length || !actualStudyId) return
+
+      try {
+        const speciesNames = selectedSpecies.map((s) => s.scientificName)
+        const response = await window.api.getSpeciesTimeseries(actualStudyId, speciesNames)
+
+        if (response.error) {
+          console.error('Error fetching species timeseries:', response.error)
+          return
+        }
+
+        setTimeseriesData(response.data.timeseries)
+      } catch (err) {
+        console.error('Failed to fetch species timeseries:', err)
+      }
+    }
+
+    fetchTimeseriesData()
+  }, [selectedSpecies, actualStudyId])
+
+  useEffect(() => {
+    if (
+      timeseriesData &&
+      timeseriesData.length > 0 &&
+      dateRange[0] === null &&
+      dateRange[1] === null
+    ) {
+      const totalPeriods = timeseriesData.length
+      const startIndex = Math.max(totalPeriods - Math.ceil(totalPeriods * 0.3), 0)
+      const endIndex = totalPeriods - 1
+
+      setDateRange([
+        new Date(timeseriesData[startIndex].date),
+        new Date(timeseriesData[endIndex].date)
+      ])
+    }
+  }, [timeseriesData])
+
+  useEffect(() => {
+    async function fetchDailyActivityData() {
+      if (!selectedSpecies.length || !dateRange[0] || !dateRange[1]) return
+
+      try {
+        const speciesNames = selectedSpecies.map((s) => s.scientificName)
+        const response = await window.api.getSpeciesDailyActivity(
+          actualStudyId,
+          speciesNames,
+          dateRange[0].toISOString(),
+          dateRange[1].toISOString()
+        )
+
+        if (response.error) {
+          console.error('Error fetching daily activity data:', response.error)
+          return
+        }
+
+        setDailyActivityData(response.data)
+      } catch (err) {
+        console.error('Failed to fetch daily activity data:', err)
+      }
+    }
+
+    fetchDailyActivityData()
+  }, [dateRange, selectedSpecies, actualStudyId])
+
+  // Handle time range changes
+  const handleTimeRangeChange = useCallback((newTimeRange) => {
+    setTimeRange(newTimeRange)
+  }, [])
+
+  // Handle species selection changes
+  const handleSpeciesChange = useCallback((newSelectedSpecies) => {
+    // Ensure we have at least one species selected
+    if (newSelectedSpecies.length === 0) {
+      return
+    }
+    setSelectedSpecies(newSelectedSpecies)
+  }, [])
+
+  return (
+    <div className="px-4 pb-4 flex flex-col h-[calc(100vh-70px)]">
+      {error ? (
+        <div className="text-red-500 py-4">Error: {error}</div>
+      ) : (
+        <div className="flex flex-col h-full gap-4">
+          {/* First row - takes remaining space */}
+          <div className="flex flex-row gap-4 flex-1 min-h-0">
+            {/* Species Distribution - left side */}
+
+            {/* Map - right side */}
+            <div className="h-full flex-1">
+              <Gallery
+                species={selectedSpecies.map((s) => s.scientificName)}
+                dateRange={dateRange}
+                timeRange={timeRange}
+              />
+            </div>
+            <div className="h-full overflow-auto w-xs">
+              {speciesDistributionData && (
+                <SpeciesDistribution
+                  data={speciesDistributionData}
+                  taxonomicData={taxonomicData}
+                  selectedSpecies={selectedSpecies}
+                  onSpeciesChange={handleSpeciesChange}
+                  palette={palette}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Second row - fixed height with timeline and clock */}
+          <div className="w-full flex h-[130px] flex-shrink-0 gap-3">
+            <div className="w-[140px] h-full rounded border border-gray-200 flex items-center justify-center relative">
+              <DailyActivityRadar
+                activityData={dailyActivityData}
+                selectedSpecies={selectedSpecies}
+                palette={palette}
+              />
+              <div className="absolute w-full h-full flex items-center justify-center">
+                <CircularTimeFilter
+                  onChange={handleTimeRangeChange}
+                  startTime={timeRange.start}
+                  endTime={timeRange.end}
+                />
+              </div>
+            </div>
+            <div className="flex-grow rounded px-2 border border-gray-200">
+              <TimelineChart
+                timeseriesData={timeseriesData}
+                selectedSpecies={selectedSpecies}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                palette={palette}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
