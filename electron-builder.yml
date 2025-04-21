@@ -1,6 +1,5 @@
 appId: org.biowatch.app
 productName: Biowatch
-name: biowatch
 directories:
   buildResources: build
 files:
