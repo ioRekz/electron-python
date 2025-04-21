@@ -1,9 +1,12 @@
 import { useNavigate } from 'react-router'
+import { useState } from 'react'
 
 export default function Import({ onNewStudy }) {
   let navigate = useNavigate()
+  const [importing, setImporting] = useState(false)
 
   const handleClassification = async () => {
+    setImporting(true)
     const { data, id } = await window.api.selectFolder()
     if (!id) return
     onNewStudy({ id, name: data.name, data })
@@ -22,7 +25,7 @@ export default function Import({ onNewStudy }) {
           onClick={handleClassification}
           className={`cursor-pointer transition-colors mt-8 flex justify-center flex-row gap-2 items-center border border-gray-200 px-2 h-10 text-sm shadow-sm rounded-md hover:bg-gray-50`}
         >
-          Start Importing
+          {importing ? <span className="animate-pulse">Importing...</span> : 'Select Folder'}
         </button>
       </div>
     </div>

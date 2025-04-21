@@ -257,7 +257,7 @@ function Gallery({ species, dateRange, timeRange }) {
       {mediaFiles.map((media) => (
         <div
           key={media.mediaID}
-          className="border border-gray-300 rounded-lg overflow-hidden w-[calc(33%-6px)] flex flex-col"
+          className="border border-gray-300 rounded-lg overflow-hidden min-w-[200px] w-[calc(33%-7px)] flex flex-col"
         >
           <div className="flex-1 bg-gray-100 flex items-center justify-center">
             <img
