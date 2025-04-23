@@ -299,6 +299,7 @@ function createWindow() {
     // show: false,
     // frame: false,
     // titleBarStyle: 'hidden',
+    autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
