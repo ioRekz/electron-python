@@ -212,7 +212,7 @@ function Gallery({ species, dateRange, timeRange }) {
   const [hasMore, setHasMore] = useState(true)
   const [initialLoad, setInitialLoad] = useState(true)
   const loaderRef = useRef(null)
-  const PAGE_SIZE = 20
+  const PAGE_SIZE = 15
 
   const { id } = useParams()
   const study = JSON.parse(localStorage.getItem('studies')).find((study) => study.id === id)
@@ -315,20 +315,20 @@ function Gallery({ species, dateRange, timeRange }) {
       {mediaFiles.map((media) => (
         <div
           key={media.mediaID}
-          className="border border-gray-300 rounded-lg overflow-hidden min-w-[200px] w-[calc(33%-7px)] flex flex-col"
+          className="border border-gray-300 rounded-lg overflow-hidden min-w-[200px] w-[calc(33%-7px)] flex flex-col h-max"
         >
-          <div className="flex-1 bg-gray-100 flex items-center justify-center">
+          <div className="bg-gray-100 flex items-center justify-center">
             <img
               src={constructImageUrl(media.filePath)}
               alt={media.fileName || `Media ${media.mediaID}`}
-              className={`object-contain w-full h-auto ${imageErrors[media.mediaID] ? 'hidden' : ''}`}
+              className={`object-contain w-full h-auto min-h-20 ${imageErrors[media.mediaID] ? 'hidden' : ''}`}
               onError={() => {
                 setImageErrors((prev) => ({ ...prev, [media.mediaID]: true }))
               }}
             />
             {imageErrors[media.mediaID] && (
               <div
-                className="flex items-center justify-center w-full h-full bg-gray-100 text-gray-400"
+                className="flex items-center justify-center w-full h-full bg-gray-100 text-gray-400 flex-1"
                 title={`Image not available or failed to load because it's not public or has been deleted/moved locally ${media.filePath}`}
               >
                 <CameraOff size={32} />
