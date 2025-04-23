@@ -439,7 +439,7 @@ export default function Overview({ data, studyId }) {
         <div className="text-red-500 py-4">Error: {error}</div>
       ) : (
         <>
-          <div className="flex flex-row gap-4 h-[450px] mt-4 flex-1">
+          <div className="flex flex-row gap-4 flex-1 min-h-0 mt-2">
             <SpeciesDistribution data={speciesData} taxonomicData={taxonomicData} />
             <DeploymentMap deployments={deploymentsData} />
           </div>

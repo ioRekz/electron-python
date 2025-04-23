@@ -116,7 +116,7 @@ function SpeciesDistribution({ data, taxonomicData, selectedSpecies, onSpeciesCh
   }
 
   return (
-    <div className="w-full h-full bg-white rounded border border-gray-200 p-3 overflow-y-auto">
+    <div className="w-full h-full bg-white rounded border border-gray-200 p-3 overflow-y-auto myscroll">
       <div className="space-y-4">
         {data.map((species, index) => {
           // Try to get the common name from the taxonomic data first, then from fetched data

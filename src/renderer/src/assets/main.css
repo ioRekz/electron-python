@@ -163,3 +163,22 @@ body {
 .recharts-wrapper .recharts-cartesian-grid-horizontal line:last-child {
   stroke-opacity: 0;
 }
+
+/* Apply scrollbar styling to all non-macOS systems */
+body:not(.mac-os) .overflow-auto::-webkit-scrollbar-track,
+body:not(.mac-os) .overflow-y-auto::-webkit-scrollbar-track {
+  border-radius: 10px;
+  background-color: transparent;
+}
+
+body:not(.mac-os) .overflow-auto::-webkit-scrollbar,
+body:not(.mac-os) .overflow-y-auto::-webkit-scrollbar {
+  width: 7px;
+  background-color: transparent;
+}
+
+body:not(.mac-os) .overflow-auto::-webkit-scrollbar-thumb,
+body:not(.mac-os) .overflow-y-auto::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background-color: #777;
+}
