@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Combobox,
   ComboboxInput,
@@ -205,40 +205,98 @@ export function Media({ studyId, path }) {
 
 function Gallery({ species, dateRange, timeRange }) {
   const [mediaFiles, setMediaFiles] = useState([])
-  const [, setLoading] = useState(true)
-  const [, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [imageErrors, setImageErrors] = useState({})
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [initialLoad, setInitialLoad] = useState(true)
+  const loaderRef = useRef(null)
+  const PAGE_SIZE = 20
 
   const { id } = useParams()
-
   const study = JSON.parse(localStorage.getItem('studies')).find((study) => study.id === id)
 
+  // Set up Intersection Observer for infinite scrolling
   useEffect(() => {
-    if (!dateRange[0] || !dateRange[1]) return
-    async function fetchMediaFiles() {
-      try {
-        console.log('Fetching media files for species:', species, dateRange, timeRange)
-        const response = await window.api.getMedia(id, {
-          species,
-          dateRange: { start: dateRange[0], end: dateRange[1] },
-          timeRange,
-          limit: 20
-        })
-        if (response.error) {
-          setError(response.error)
-        } else {
-          console.log('Fetched media filess:', response.data)
-          setMediaFiles(response.data)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !initialLoad) {
+          loadMoreMedia()
         }
-      } catch (err) {
-        setError(err.message || 'Failed to fetch media files')
-      } finally {
-        setLoading(false)
-      }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loaderRef.current) {
+      observer.observe(loaderRef.current)
     }
 
-    fetchMediaFiles()
-  }, [dateRange, species, timeRange, id])
+    return () => {
+      if (loaderRef.current) {
+        observer.unobserve(loaderRef.current)
+      }
+    }
+  }, [hasMore, loading, initialLoad, loaderRef])
+
+  useEffect(() => {
+    // Reset pagination when filters change
+    setMediaFiles([])
+    setPage(1)
+    setHasMore(true)
+    setInitialLoad(true)
+
+    if (!dateRange[0] || !dateRange[1]) return
+
+    loadMedia(1, true)
+  }, [species, dateRange, timeRange, id])
+
+  const loadMedia = async (pageNum, isNewSearch = false) => {
+    try {
+      setLoading(true)
+
+      console.log(
+        'Fetching media files for species:',
+        species,
+        dateRange,
+        timeRange,
+        'page:',
+        pageNum
+      )
+      const response = await window.api.getMedia(id, {
+        species,
+        dateRange: { start: dateRange[0], end: dateRange[1] },
+        timeRange,
+        limit: PAGE_SIZE,
+        offset: (pageNum - 1) * PAGE_SIZE
+      })
+
+      if (response.error) {
+        setError(response.error)
+      } else {
+        if (isNewSearch) {
+          setMediaFiles(response.data)
+        } else {
+          setMediaFiles((prev) => [...prev, ...response.data])
+        }
+
+        setHasMore(response.data.length === PAGE_SIZE)
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to fetch media files')
+    } finally {
+      setLoading(false)
+      setInitialLoad(false)
+    }
+  }
+
+  const loadMoreMedia = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1
+      setPage(nextPage)
+      loadMedia(nextPage, false)
+    }
+  }
 
   const constructImageUrl = (fullFilePath) => {
     if (fullFilePath.startsWith('http')) {
@@ -283,6 +341,22 @@ function Gallery({ species, dateRange, timeRange }) {
           </div>
         </div>
       ))}
+
+      {/* Loading indicator and intersection target */}
+      <div ref={loaderRef} className="w-full flex justify-center p-4">
+        {loading && !initialLoad && (
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+            <span className="ml-2">Loading more...</span>
+          </div>
+        )}
+        {!hasMore && mediaFiles.length > 0 && (
+          <p className="text-gray-500 text-sm">No more images to load</p>
+        )}
+        {!hasMore && mediaFiles.length === 0 && !loading && (
+          <p className="text-gray-500">No media files match the selected filters</p>
+        )}
+      </div>
     </div>
   )
 }

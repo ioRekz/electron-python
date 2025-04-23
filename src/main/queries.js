@@ -754,6 +754,7 @@ export async function getSpeciesHeatmapData(
  * @param {string} dbPath - Path to the SQLite database
  * @param {Object} options - Query options
  * @param {number} options.limit - Maximum number of media files to return
+ * @param {number} options.offset - Number of records to skip for pagination
  * @param {Array<string>} options.species - List of species to filter by (optional)
  * @param {Object} options.dateRange - Date range to filter by (optional)
  * @param {string} options.dateRange.start - Start date (ISO string)
@@ -764,10 +765,11 @@ export async function getSpeciesHeatmapData(
  * @returns {Promise<Array>} - Media files matching the criteria
  */
 export async function getMedia(dbPath, options = {}) {
-  const { limit = 10, species = [], dateRange = {}, timeRange = {} } = options
+  const { limit = 10, offset = 0, species = [], dateRange = {}, timeRange = {} } = options
 
   return new Promise((resolve, reject) => {
     log.info(`Querying media files from: ${dbPath} with filtering options`)
+    log.info(`Pagination: limit ${limit}, offset ${offset}`)
 
     if (species.length > 0) {
       log.info(`Species filter: ${species.join(', ')}`)
@@ -825,7 +827,7 @@ export async function getMedia(dbPath, options = {}) {
         queryParams.push(startDate, endDate)
       }
 
-      // // Add time of day filter if provided
+      // Add time of day filter if provided
       if (timeRange.start !== undefined && timeRange.end !== undefined) {
         if (timeRange.start < timeRange.end) {
           // Simple range (e.g., 8:00 to 17:00)
@@ -840,12 +842,12 @@ export async function getMedia(dbPath, options = {}) {
         }
       }
 
-      // Add ordering and limit
+      // Add ordering and limit with offset for pagination
       query += `
         ORDER BY m.timestamp DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
       `
-      queryParams.push(limit)
+      queryParams.push(limit, offset)
 
       db.all(query, queryParams, (err, rows) => {
         // Close the database
@@ -856,7 +858,7 @@ export async function getMedia(dbPath, options = {}) {
           return reject(err)
         }
 
-        log.info(`Retrieved ${rows.length} media files matching criteria`)
+        log.info(`Retrieved ${rows.length} media files matching criteria (offset: ${offset})`)
         resolve(rows)
       })
     })
