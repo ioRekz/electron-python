@@ -219,7 +219,7 @@ export default function Deployments({ studyId }) {
   console.log('Activity data:', activity)
 
   return (
-    <div className="flex flex-col gap-6 px-4 h-[calc(100vh-100px)]">
+    <div className="flex flex-col gap-6 px-4 h-full">
       {activity && (
         <LocationMap
           locations={activity.locations}

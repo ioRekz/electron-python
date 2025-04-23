@@ -253,7 +253,7 @@ function Gallery({ species, dateRange, timeRange }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-[12px]  h-full overflow-auto">
+    <div className="flex flex-wrap gap-[12px] h-full overflow-auto">
       {mediaFiles.map((media) => (
         <div
           key={media.mediaID}
@@ -419,7 +419,7 @@ export default function Activity({ studyData, studyId }) {
   }, [])
 
   return (
-    <div className="px-4 pb-4 flex flex-col h-[calc(100vh-70px)]">
+    <div className="px-4 flex flex-col h-full">
       {error ? (
         <div className="text-red-500 py-4">Error: {error}</div>
       ) : (

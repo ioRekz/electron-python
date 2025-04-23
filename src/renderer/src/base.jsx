@@ -263,11 +263,13 @@ function AppContent() {
           )}
         </footer>
       </div>
-      <main className="ml-52 relative flex w-[calc(100%-14rem)] flex-1 flex-col bg-white rounded-xl shadow mt-3 mr-3">
-        <Routes>
-          <Route path="/import" element={<Import onNewStudy={onNewStudy} />} />
-          <Route path="/study/:id/*" element={<Study />} />
-        </Routes>
+      <main className="ml-52 relative flex w-[calc(100%-14rem)] flex-1 bg-transparent pt-3 pr-3">
+        <div className="flex-col bg-white rounded-t-xl shadow w-full">
+          <Routes>
+            <Route path="/import" element={<Import onNewStudy={onNewStudy} />} />
+            <Route path="/study/:id/*" element={<Study />} />
+          </Routes>
+        </div>
       </main>
 
       {/* Drag overlay */}

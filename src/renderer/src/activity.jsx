@@ -426,7 +426,7 @@ export default function Activity({ studyData, studyId }) {
   }, [])
 
   return (
-    <div className="px-4 pb-4 flex flex-col h-[calc(100vh-70px)]">
+    <div className="px-4 flex flex-col h-full">
       {loading ? (
         <div className="py-4">Loading activity data...</div>
       ) : error ? (

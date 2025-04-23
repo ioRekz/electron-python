@@ -313,7 +313,7 @@ export default function Overview({ data, studyId }) {
   const taxonomicData = data.taxonomic || null
 
   return (
-    <div className="flex flex-col px-4 gap-4">
+    <div className="flex flex-col px-4 gap-4 h-full">
       <header className="flex flex-col">
         <div className="flex gap-2">
           <a
@@ -439,7 +439,7 @@ export default function Overview({ data, studyId }) {
         <div className="text-red-500 py-4">Error: {error}</div>
       ) : (
         <>
-          <div className="flex flex-row gap-4 h-[450px] mt-4">
+          <div className="flex flex-row gap-4 h-[450px] mt-4 flex-1">
             <SpeciesDistribution data={speciesData} taxonomicData={taxonomicData} />
             <DeploymentMap deployments={deploymentsData} />
           </div>
