@@ -425,14 +425,12 @@ export default function Activity({ studyData, studyId }) {
     setSelectedSpecies(newSelectedSpecies)
   }, [])
 
+  console.log('Selected species:', selectedSpecies.map((s) => s.scientificName).join(', '))
+
   return (
     <div className="px-4 flex flex-col h-full">
-      {loading ? (
-        <div className="py-4">Loading activity data...</div>
-      ) : error ? (
+      {error ? (
         <div className="text-red-500 py-4">Error: {error}</div>
-      ) : !timeseriesData || timeseriesData.length === 0 ? (
-        <div className="text-gray-500 py-4">No activity data available</div>
       ) : (
         <div className="flex flex-col h-full gap-4">
           {/* First row - takes remaining space */}
@@ -446,18 +444,27 @@ export default function Activity({ studyData, studyId }) {
                   heatmapData={heatmapData}
                   selectedSpecies={selectedSpecies}
                   palette={palette}
-                  geoKey={selectedSpecies + ' ' + dateRange + ' ' + timeRange}
+                  geoKey={
+                    selectedSpecies.map((s) => s.scientificName).join(', ') +
+                    ' ' +
+                    dateRange +
+                    ' ' +
+                    timeRange.start +
+                    timeRange.end
+                  }
                 />
               )}
             </div>
             <div className="h-full overflow-auto w-xs">
-              <SpeciesDistribution
-                data={speciesDistributionData}
-                taxonomicData={taxonomicData}
-                selectedSpecies={selectedSpecies}
-                onSpeciesChange={handleSpeciesChange}
-                palette={palette}
-              />
+              {speciesDistributionData && (
+                <SpeciesDistribution
+                  data={speciesDistributionData}
+                  taxonomicData={taxonomicData}
+                  selectedSpecies={selectedSpecies}
+                  onSpeciesChange={handleSpeciesChange}
+                  palette={palette}
+                />
+              )}
             </div>
           </div>
 

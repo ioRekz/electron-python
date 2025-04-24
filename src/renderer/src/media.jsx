@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Combobox,
   ComboboxInput,
@@ -77,132 +77,6 @@ const SpeciesFilter = ({ speciesList, selectedSpecies, onChange }) => {
   )
 }
 
-export function Media({ studyId, path }) {
-  const [mediaFiles, setMediaFiles] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [timeRange, setTimeRange] = useState({ start: 0, end: 24 })
-  const [selectedSpecies, setSelectedSpecies] = useState('')
-  const [speciesList, setSpeciesList] = useState([])
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true)
-
-        // Get media files
-        const mediaResponse = await window.api.getLatestMedia(studyId, 50)
-        if (mediaResponse.error) {
-          console.error('Failed to load media:', mediaResponse.error)
-        } else {
-          setMediaFiles(mediaResponse.data || [])
-        }
-
-        // Get species distribution
-        const speciesResponse = await window.api.getSpeciesDistribution(studyId)
-        if (speciesResponse.error) {
-          console.error('Failed to load species:', speciesResponse.error)
-        } else {
-          setSpeciesList(speciesResponse.data || [])
-        }
-
-        setLoading(false)
-      } catch (err) {
-        console.error('Failed to load data:', err)
-        setLoading(false)
-      }
-    }
-
-    loadData()
-  }, [studyId])
-
-  const handleTimeRangeChange = useCallback(
-    (range) => {
-      setTimeRange(range)
-    },
-    [setTimeRange]
-  )
-
-  const handleSpeciesChange = useCallback(
-    (species) => {
-      setSelectedSpecies(species)
-    },
-    [setSelectedSpecies]
-  )
-
-  const constructImageUrl = (fullFilePath) => {
-    console.log('fullFilePath', fullFilePath)
-    if (fullFilePath.startsWith('http')) {
-      return fullFilePath
-    }
-    const filePathParts = fullFilePath.split('/')
-    const filePath = filePathParts.slice(1).join('/')
-    const fullPath = `${path}/${filePath}`
-    const urlPath = fullPath.replace(/\\/g, '/')
-
-    return `local-file://get?path=${encodeURIComponent(urlPath)}`
-  }
-
-  const filteredMedia = mediaFiles.filter((media) => {
-    // Filter by time
-    const date = new Date(media.timestamp)
-    const hours = date.getHours() + date.getMinutes() / 60
-
-    const matchesTimeRange =
-      timeRange.start <= timeRange.end
-        ? hours >= timeRange.start && hours <= timeRange.end
-        : hours >= timeRange.start || hours <= timeRange.end
-
-    // Filter by species
-    const matchesSpecies =
-      !selectedSpecies || media.scientificName === selectedSpecies.scientificName
-
-    return matchesTimeRange && matchesSpecies
-  })
-
-  return (
-    <div className="flex flex-col gap-6 px-4 h-[calc(100vh-100px)] pb-4">
-      <div className="flex gap-4 items-center">
-        <SpeciesFilter
-          speciesList={speciesList}
-          selectedSpecies={selectedSpecies}
-          onChange={handleSpeciesChange}
-        />
-        <CircularTimeFilter onChange={handleTimeRangeChange} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-4">
-        {loading ? (
-          <div className="col-span-full text-center py-4">Loading media files...</div>
-        ) : filteredMedia.length === 0 ? (
-          <div className="col-span-full text-center py-4">
-            {mediaFiles.length === 0
-              ? 'No media files found'
-              : 'No media files match the selected filters'}
-          </div>
-        ) : (
-          filteredMedia.map((media) => (
-            <div key={media.mediaID} className="border border-gray-300 rounded-lg overflow-hidden">
-              <div className="bg-gray-100 flex items-center justify-center">
-                <img
-                  src={constructImageUrl(media.filePath)}
-                  alt={media.fileName || `Media ${media.mediaID}`}
-                  className="object-cover w-full h-full"
-                />
-              </div>
-              <div className="p-2">
-                <h3 className="text-sm font-semibold truncate">{media.scientificName}</h3>
-                <p className="text-xs text-gray-500">
-                  {new Date(media.timestamp).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
 function Gallery({ species, dateRange, timeRange }) {
   const [mediaFiles, setMediaFiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -213,9 +87,22 @@ function Gallery({ species, dateRange, timeRange }) {
   const [initialLoad, setInitialLoad] = useState(true)
   const loaderRef = useRef(null)
   const PAGE_SIZE = 15
+  const debounceTimeoutRef = useRef(null)
 
   const { id } = useParams()
   const study = JSON.parse(localStorage.getItem('studies')).find((study) => study.id === id)
+
+  // Debounce function
+  const debounce = (func, delay) => {
+    return (...args) => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+      debounceTimeoutRef.current = setTimeout(() => {
+        func(...args)
+      }, delay)
+    }
+  }
 
   // Set up Intersection Observer for infinite scrolling
   useEffect(() => {
@@ -239,56 +126,66 @@ function Gallery({ species, dateRange, timeRange }) {
     }
   }, [hasMore, loading, initialLoad, loaderRef])
 
+  // Create a memoized version of loadMedia to avoid recreating on each render
+  const loadMedia = useCallback(
+    async (pageNum, isNewSearch = false) => {
+      try {
+        setLoading(true)
+
+        console.log(
+          'Fetching media files for species:',
+          species,
+          dateRange,
+          timeRange,
+          'page:',
+          pageNum
+        )
+        const response = await window.api.getMedia(id, {
+          species,
+          dateRange: { start: dateRange[0], end: dateRange[1] },
+          timeRange,
+          limit: PAGE_SIZE,
+          offset: (pageNum - 1) * PAGE_SIZE
+        })
+
+        if (response.error) {
+          setError(response.error)
+        } else {
+          if (isNewSearch) {
+            setMediaFiles(response.data)
+          } else {
+            setMediaFiles((prev) => [...prev, ...response.data])
+          }
+
+          setHasMore(response.data.length === PAGE_SIZE)
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to fetch media files')
+      } finally {
+        setLoading(false)
+        setInitialLoad(false)
+      }
+    },
+    [id, species, dateRange, timeRange]
+  )
+
+  // Create a debounced version of loadMedia
+  const debouncedLoadMedia = useMemo(
+    () => debounce((pageNum, isNewSearch) => loadMedia(pageNum, isNewSearch), 100),
+    [loadMedia]
+  )
+
   useEffect(() => {
     // Reset pagination when filters change
-    setMediaFiles([])
+    // setMediaFiles([])
     setPage(1)
     setHasMore(true)
     setInitialLoad(true)
 
     if (!dateRange[0] || !dateRange[1]) return
 
-    loadMedia(1, true)
-  }, [species, dateRange, timeRange, id])
-
-  const loadMedia = async (pageNum, isNewSearch = false) => {
-    try {
-      setLoading(true)
-
-      console.log(
-        'Fetching media files for species:',
-        species,
-        dateRange,
-        timeRange,
-        'page:',
-        pageNum
-      )
-      const response = await window.api.getMedia(id, {
-        species,
-        dateRange: { start: dateRange[0], end: dateRange[1] },
-        timeRange,
-        limit: PAGE_SIZE,
-        offset: (pageNum - 1) * PAGE_SIZE
-      })
-
-      if (response.error) {
-        setError(response.error)
-      } else {
-        if (isNewSearch) {
-          setMediaFiles(response.data)
-        } else {
-          setMediaFiles((prev) => [...prev, ...response.data])
-        }
-
-        setHasMore(response.data.length === PAGE_SIZE)
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to fetch media files')
-    } finally {
-      setLoading(false)
-      setInitialLoad(false)
-    }
-  }
+    debouncedLoadMedia(1, true)
+  }, [species, dateRange, timeRange, id, debouncedLoadMedia])
 
   const loadMoreMedia = () => {
     if (!loading && hasMore) {
@@ -309,6 +206,8 @@ function Gallery({ species, dateRange, timeRange }) {
 
     return `local-file://get?path=${encodeURIComponent(urlPath)}`
   }
+
+  console.log('mediaFiles', mediaFiles)
 
   return (
     <div className="flex flex-wrap gap-[12px] h-full overflow-auto">

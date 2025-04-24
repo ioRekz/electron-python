@@ -151,16 +151,22 @@ function LocationsList({ activity, selectedLocation, setSelectedLocation }) {
         </div>
         <div className="flex flex-col divide-y divide-gray-200 mb-4">
           {activity.locations
-            .sort((a, b) => new Date(a.deploymentStart) - new Date(b.deploymentStart))
+            .sort(
+              (a, b) =>
+                new Date(a.periods.find((p) => p.count > 0).start) -
+                new Date(b.periods.find((p) => p.count > 0).start)
+            )
             .map((location) => (
               <div
                 key={location.locationID}
                 id={location.locationID}
+                title={location.deploymentStart}
                 className="flex gap-4 items-center py-4 first:pt-1"
               >
                 <div
                   className={`hover:font-bold cursor-pointer text-sm w-56 truncate text-gray-700 ${selectedLocation?.locationID === location.locationID ? 'font-bold' : ''}`}
                   onClick={() => setSelectedLocation(location)}
+                  title={location.deploymentStart}
                 >
                   {location.locationName || location.locationID || 'Unnamed Location'}
                 </div>
