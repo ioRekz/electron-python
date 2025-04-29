@@ -290,22 +290,22 @@ export default function Activity({ studyData, studyId }) {
       try {
         setLoading(true)
 
-        const response = await window.api.getTopSpeciesTimeseries(actualStudyId)
+        // const response = await window.api.getTopSpeciesTimeseries(actualStudyId)
         const speciesResponse = await window.api.getSpeciesDistribution(actualStudyId)
 
-        if (response.error) {
-          setError(response.error)
-        } else {
-          setTimeseriesData(response.data.timeseries)
+        // setTimeseriesData(response.data.timeseries)
 
-          // Default select the top 2 species
-          setSelectedSpecies(response.data.allSpecies.slice(0, 2))
-        }
+        // Default select the top 2 species
+        // setSelectedSpecies(response.data.allSpecies.slice(0, 2))
+        // console.log('SELECTED SPECIES', response.data.allSpecies.slice(0, 2))
+        console.log('Species response:', speciesResponse.data.slice(0, 2))
 
         if (speciesResponse.error) {
           console.error('Error fetching species distribution:', speciesResponse.error)
         } else {
           setSpeciesDistributionData(speciesResponse.data)
+
+          setSelectedSpecies(speciesResponse.data.slice(0, 2))
         }
       } catch (err) {
         setError(err.message || 'Failed to fetch activity data')
@@ -319,6 +319,8 @@ export default function Activity({ studyData, studyId }) {
     }
   }, [actualStudyId])
 
+  // console.log('selected', selectedSpecies)
+
   useEffect(() => {
     async function fetchTimeseriesData() {
       if (!selectedSpecies.length || !actualStudyId) return
@@ -331,6 +333,8 @@ export default function Activity({ studyData, studyId }) {
           console.error('Error fetching species timeseries:', response.error)
           return
         }
+
+        console.log('Timeseries response:', response.data)
 
         setTimeseriesData(response.data.timeseries)
       } catch (err) {
@@ -357,7 +361,7 @@ export default function Activity({ studyData, studyId }) {
         new Date(timeseriesData[endIndex].date)
       ])
     }
-  }, [timeseriesData])
+  }, [timeseriesData, dateRange])
 
   useEffect(() => {
     async function fetchHeatmapData() {

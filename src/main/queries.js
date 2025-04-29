@@ -8,6 +8,7 @@ import log from 'electron-log'
  */
 export async function getSpeciesDistribution(dbPath) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying species distribution from: ${dbPath}`)
 
     // Open the database
@@ -37,7 +38,8 @@ export async function getSpeciesDistribution(dbPath) {
           return reject(err)
         }
 
-        log.info(`Retrieved species distribution: ${rows.length} species found`)
+        const elapsedTime = Date.now() - startTime
+        log.info(`Retrieved species distribution: ${rows.length} species found in ${elapsedTime}ms`)
         resolve(rows)
       })
     })
@@ -51,6 +53,7 @@ export async function getSpeciesDistribution(dbPath) {
  */
 export async function getDeployments(dbPath) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying deployments from: ${dbPath}`)
 
     // Open the database
@@ -95,7 +98,10 @@ export async function getDeployments(dbPath) {
           return reject(err)
         }
 
-        log.info(`Retrieved distinct deployments: ${rows.length} locations found`)
+        const elapsedTime = Date.now() - startTime
+        log.info(
+          `Retrieved distinct deployments: ${rows.length} locations found in ${elapsedTime}ms`
+        )
         resolve(rows)
       })
     })
@@ -109,6 +115,7 @@ export async function getDeployments(dbPath) {
  */
 export async function getDeploymentsActivity(dbPath) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying deployment activity from: ${dbPath}`)
 
     const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
@@ -253,8 +260,9 @@ export async function getDeploymentsActivity(dbPath) {
               deployments: Array.from(deploymentMap.values())
             }
 
+            const elapsedTime = Date.now() - startTime
             log.info(
-              `Retrieved deployment activity data for ${result.deployments.length} deployments`
+              `Retrieved deployment activity data for ${result.deployments.length} deployments in ${elapsedTime}ms`
             )
             resolve(result)
           })
@@ -271,6 +279,7 @@ export async function getDeploymentsActivity(dbPath) {
  */
 export async function getLocationsActivity(dbPath) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying location activity from: ${dbPath}`)
 
     const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
@@ -410,7 +419,10 @@ export async function getLocationsActivity(dbPath) {
               locations: Array.from(locationMap.values())
             }
 
-            log.info(`Retrieved location activity data for ${result.locations.length} locations`)
+            const elapsedTime = Date.now() - startTime
+            log.info(
+              `Retrieved location activity data for ${result.locations.length} locations in ${elapsedTime}ms`
+            )
             resolve(result)
           })
         })
@@ -426,6 +438,7 @@ export async function getLocationsActivity(dbPath) {
  */
 export async function getTopSpeciesTimeseries(dbPath) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying top species timeseries from: ${dbPath}`)
 
     // Open the database
@@ -456,6 +469,8 @@ export async function getTopSpeciesTimeseries(dbPath) {
         if (allSpecies.length === 0) {
           db.close()
           log.info('No species data found')
+          const elapsedTime = Date.now() - startTime
+          log.info(`Retrieved timeseries data: 0 weeks for all species in ${elapsedTime}ms`)
           return resolve({ allSpecies: [], timeseries: [] })
         }
 
@@ -466,6 +481,7 @@ export async function getTopSpeciesTimeseries(dbPath) {
               date(min(substr(eventStart, 1, 10)), 'weekday 0') AS start_week,
               date(max(substr(eventStart, 1, 10)), 'weekday 0') AS end_week
             FROM observations
+            WHERE substr(eventStart, 1, 4) > '1970'
           ),
           weeks(week_start) AS (
             SELECT start_week FROM date_range
@@ -517,7 +533,10 @@ export async function getTopSpeciesTimeseries(dbPath) {
           // Process the SQL results into the expected format
           const processedData = processTimeseriesDataFromSql(timeseries)
 
-          log.info(`Retrieved timeseries data: ${processedData.length} weeks for all species`)
+          const elapsedTime = Date.now() - startTime
+          log.info(
+            `Retrieved top timeseries data: ${processedData.length} weeks for all species in ${elapsedTime}ms`
+          )
           resolve({
             allSpecies: allSpecies,
             timeseries: processedData
@@ -536,6 +555,7 @@ export async function getTopSpeciesTimeseries(dbPath) {
  */
 export async function getSpeciesTimeseries(dbPath, speciesNames = []) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying species timeseries from: ${dbPath} for specific species`)
     log.info(`Selected species: ${speciesNames.join(', ')}`)
 
@@ -563,6 +583,7 @@ export async function getSpeciesTimeseries(dbPath, speciesNames = []) {
             date(min(substr(eventStart, 1, 10)), 'weekday 0') AS start_week,
             date(max(substr(eventStart, 1, 10)), 'weekday 0') AS end_week
           FROM observations
+          WHERE substr(eventStart, 1, 4) > '1970'
         ),
         weeks(week_start) AS (
           SELECT start_week FROM date_range
@@ -634,8 +655,9 @@ export async function getSpeciesTimeseries(dbPath, speciesNames = []) {
         // Convert the map to an array and sort by count descending
         const speciesData = Array.from(speciesMap.values()).sort((a, b) => b.count - a.count)
 
+        const elapsedTime = Date.now() - startTime
         log.info(
-          `Retrieved timeseries data: ${processedData.length} weeks for ${speciesData.length} species`
+          `Retrieved timeseries data: ${processedData.length} weeks for ${speciesData.length} species in ${elapsedTime}ms`
         )
         resolve({
           allSpecies: speciesData,
@@ -665,6 +687,7 @@ export async function getSpeciesHeatmapData(
   endHour = 24
 ) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying species heatmap data from: ${dbPath}`)
     log.info(`Date range: ${startDate} to ${endDate}`)
     log.info(`Time range: ${startHour} to ${endHour} hours`)
@@ -742,7 +765,8 @@ export async function getSpeciesHeatmapData(
           }
         })
 
-        log.info(`Retrieved heatmap data: ${rows.length} location points`)
+        const elapsedTime = Date.now() - startTime
+        log.info(`Retrieved heatmap data: ${rows.length} location points in ${elapsedTime}ms`)
         resolve(speciesData)
       })
     })
@@ -768,6 +792,7 @@ export async function getMedia(dbPath, options = {}) {
   const { limit = 10, offset = 0, species = [], dateRange = {}, timeRange = {} } = options
 
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying media files from: ${dbPath} with filtering options`)
     log.info(`Pagination: limit ${limit}, offset ${offset}`)
 
@@ -858,7 +883,10 @@ export async function getMedia(dbPath, options = {}) {
           return reject(err)
         }
 
-        log.info(`Retrieved ${rows.length} media files matching criteria (offset: ${offset})`)
+        const elapsedTime = Date.now() - startTime
+        log.info(
+          `Retrieved ${rows.length} media files matching criteria (offset: ${offset}) in ${elapsedTime}ms`
+        )
         resolve(rows)
       })
     })
@@ -875,6 +903,7 @@ export async function getMedia(dbPath, options = {}) {
  */
 export async function getSpeciesDailyActivity(dbPath, species, startDate, endDate) {
   return new Promise((resolve, reject) => {
+    const startTime = Date.now()
     log.info(`Querying species daily activity from: ${dbPath}`)
     log.info(`Date range: ${startDate} to ${endDate}`)
     log.info(`Species: ${species.join(', ')}`)
@@ -925,7 +954,10 @@ export async function getSpeciesDailyActivity(dbPath, species, startDate, endDat
           hourlyData[row.hour][row.scientificName] = row.count
         })
 
-        log.info(`Retrieved daily activity data: ${rows.length} hour/species combinations`)
+        const elapsedTime = Date.now() - startTime
+        log.info(
+          `Retrieved daily activity data: ${rows.length} hour/species combinations in ${elapsedTime}ms`
+        )
         resolve(hourlyData)
       })
     })

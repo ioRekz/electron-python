@@ -35,6 +35,7 @@ mac:
   notarize: true
 dmg:
   artifactName: ${name}-${version}.${ext}
+  # arch: universal
 linux:
   target:
     - AppImage
