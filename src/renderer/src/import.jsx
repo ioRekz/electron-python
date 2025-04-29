@@ -4,6 +4,7 @@ import { useState } from 'react'
 export default function Import({ onNewStudy }) {
   let navigate = useNavigate()
   const [importing, setImporting] = useState(false)
+  const [isDemoImporting, setIsDemoImporting] = useState(false)
 
   const handleClassification = async () => {
     setImporting(true)
@@ -11,6 +12,22 @@ export default function Import({ onNewStudy }) {
     if (!id) return
     onNewStudy({ id, name: data.name, data })
     navigate(`/study/${id}`)
+  }
+
+  const handleDemoDataset = async () => {
+    setIsDemoImporting(true)
+    try {
+      const { data, id } = await window.api.downloadDemoDataset()
+      if (!id) {
+        setIsDemoImporting(false)
+        return
+      }
+      onNewStudy({ id, name: data.name, data })
+      navigate(`/study/${id}`)
+    } catch (error) {
+      console.error('Failed to import demo dataset:', error)
+      setIsDemoImporting(false)
+    }
   }
 
   return (
@@ -26,6 +43,27 @@ export default function Import({ onNewStudy }) {
           className={`cursor-pointer transition-colors mt-8 flex justify-center flex-row gap-2 items-center border border-gray-200 px-2 h-10 text-sm shadow-sm rounded-md hover:bg-gray-50`}
         >
           {importing ? <span className="animate-pulse">Importing...</span> : 'Select Folder'}
+        </button>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">or</span>
+          </div>
+        </div>
+        <button
+          onClick={handleDemoDataset}
+          disabled={isDemoImporting}
+          className={`cursor-pointer transition-colors flex justify-center flex-row gap-2 items-center border border-gray-200 px-2 h-10 text-sm shadow-sm rounded-md hover:bg-gray-50 ${
+            isDemoImporting ? 'opacity-70' : ''
+          }`}
+        >
+          {isDemoImporting ? (
+            <span className="animate-pulse">Downloading demo dataset...</span>
+          ) : (
+            'Use Demo Dataset'
+          )}
         </button>
       </div>
     </div>

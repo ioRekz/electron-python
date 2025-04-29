@@ -660,6 +660,171 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Add demo dataset download handler
+  ipcMain.handle('download-demo-dataset', async () => {
+    try {
+      log.info('Downloading and importing demo dataset')
+
+      // Create a temp directory for the downloaded file
+      const downloadDir = join(app.getPath('temp'), 'camtrap-demo')
+      if (!existsSync(downloadDir)) {
+        mkdirSync(downloadDir, { recursive: true })
+      }
+
+      // URL for the demo dataset
+      const demoDatasetUrl = 'https://gbif.mnhn.lu/ipt/archive.do?r=luxvalmoni20223025'
+      const zipPath = join(downloadDir, 'demo-dataset.zip')
+      const extractPath = join(downloadDir, 'extracted')
+
+      // Download the file
+      log.info(`Downloading demo dataset from ${demoDatasetUrl} to ${zipPath}`)
+      await downloadFile(demoDatasetUrl, zipPath)
+      log.info('Download complete')
+
+      // Create extraction directory if it doesn't exist
+      if (!existsSync(extractPath)) {
+        mkdirSync(extractPath, { recursive: true })
+      } else {
+        // Clean the extraction directory first to avoid conflicts
+        const files = readdirSync(extractPath)
+        for (const file of files) {
+          const filePath = join(extractPath, file)
+          if (statSync(filePath).isDirectory()) {
+            // Use rimraf or a similar recursive delete function for directories
+            await new Promise((resolve, reject) => {
+              const rmProcess = spawn('rm', ['-rf', filePath])
+              rmProcess.on('close', (code) => {
+                if (code === 0) resolve()
+                else reject(new Error(`Failed to delete directory: ${filePath}`))
+              })
+              rmProcess.on('error', reject)
+            })
+          } else {
+            unlinkSync(filePath)
+          }
+        }
+      }
+
+      // Extract the zip file using tar
+      log.info(`Extracting ${zipPath} to ${extractPath}`)
+      await new Promise((resolve, reject) => {
+        // tar can extract zip files with the right flags (-xf for extract, automatic format detection)
+        const tarProcess = spawn('tar', ['-xf', zipPath, '-C', extractPath])
+
+        tarProcess.stdout.on('data', (data) => {
+          log.info(`tar output: ${data}`)
+        })
+
+        tarProcess.stderr.on('data', (data) => {
+          // Not necessarily an error, tar outputs progress to stderr
+          log.info(`tar progress: ${data}`)
+        })
+
+        tarProcess.on('error', (err) => {
+          log.error(`Error executing tar command:`, err)
+          reject(err)
+        })
+
+        tarProcess.on('close', (code) => {
+          if (code === 0) {
+            log.info(`Extraction complete to ${extractPath}`)
+            resolve()
+          } else {
+            const err = new Error(`tar process exited with code ${code}`)
+            log.error(err)
+            reject(err)
+          }
+        })
+      })
+
+      // Find the directory containing a datapackage.json file
+      let camtrapDpDirPath = null
+
+      const findCamtrapDpDir = (dir) => {
+        if (camtrapDpDirPath) return // Already found, exit recursion
+
+        try {
+          const files = readdirSync(dir)
+
+          // First check if this directory has datapackage.json
+          if (files.includes('datapackage.json')) {
+            camtrapDpDirPath = dir
+            return
+          }
+
+          // Then check subdirectories
+          for (const file of files) {
+            const fullPath = join(dir, file)
+            if (statSync(fullPath).isDirectory()) {
+              findCamtrapDpDir(fullPath)
+            }
+          }
+        } catch (error) {
+          log.warn(`Error reading directory ${dir}: ${error.message}`)
+        }
+      }
+
+      findCamtrapDpDir(extractPath)
+
+      if (!camtrapDpDirPath) {
+        throw new Error('CamTrap DP directory with datapackage.json not found in extracted archive')
+      }
+
+      log.info(`Found CamTrap DP directory at ${camtrapDpDirPath}`)
+
+      // Import the dataset using the existing function
+      const id = crypto.randomUUID()
+      const { data } = await importCamTrapDataset(camtrapDpDirPath, id)
+
+      // Return the result before cleaning up so the UI can proceed
+      const result = {
+        path: camtrapDpDirPath,
+        data,
+        id
+      }
+
+      // Clean up the downloaded zip file and extracted directory after successful import
+      log.info('Cleaning up temporary files after successful import...')
+
+      // Delete the zip file
+      try {
+        if (existsSync(zipPath)) {
+          unlinkSync(zipPath)
+          log.info(`Deleted zip file: ${zipPath}`)
+        }
+      } catch (error) {
+        log.warn(`Failed to delete zip file: ${error.message}`)
+      }
+
+      // Delete the extracted directory recursively
+      try {
+        await new Promise((resolve, reject) => {
+          const rmProcess = spawn('rm', ['-rf', extractPath])
+          rmProcess.on('close', (code) => {
+            if (code === 0) {
+              log.info(`Deleted extraction directory: ${extractPath}`)
+              resolve()
+            } else {
+              log.warn(`Failed to delete extraction directory, exit code: ${code}`)
+              resolve() // Still resolve to avoid blocking the import process
+            }
+          })
+          rmProcess.on('error', (err) => {
+            log.warn(`Error during extraction directory cleanup: ${err.message}`)
+            resolve() // Still resolve to avoid blocking the import process
+          })
+        })
+      } catch (error) {
+        log.warn(`Failed to cleanup extraction directory: ${error.message}`)
+      }
+
+      return result
+    } catch (error) {
+      log.error('Error downloading or importing demo dataset:', error)
+      throw error
+    }
+  })
+
   try {
     // await startPythonServer()
 

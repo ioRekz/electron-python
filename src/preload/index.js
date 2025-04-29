@@ -19,6 +19,9 @@ const api = {
   downloadModel: async () => {
     return await electronAPI.ipcRenderer.invoke('download-model')
   },
+  downloadDemoDataset: async () => {
+    return await electronAPI.ipcRenderer.invoke('download-demo-dataset')
+  },
   getSpeciesDistribution: async (studyId) => {
     return await electronAPI.ipcRenderer.invoke('get-species-distribution', studyId)
   },
