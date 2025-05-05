@@ -1,6 +1,6 @@
-# electron-python
+# Biowatch
 
-An Electron application with React
+Desktop app to visualise and exploure camtrap dp datasets
 
 ## Recommended IDE Setup
 
