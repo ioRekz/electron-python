@@ -224,6 +224,7 @@ function Gallery({ species, dateRange, timeRange }) {
               onError={() => {
                 setImageErrors((prev) => ({ ...prev, [media.mediaID]: true }))
               }}
+              loading="lazy"
             />
             {imageErrors[media.mediaID] && (
               <div
