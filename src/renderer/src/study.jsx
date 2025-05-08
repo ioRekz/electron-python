@@ -54,6 +54,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 
 export default function Study() {
   let { id } = useParams()
+  console.log('window', window.location.href)
   const study = JSON.parse(localStorage.getItem('studies')).find((study) => study.id === id)
   console.log('S', study)
 

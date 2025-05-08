@@ -1,12 +1,13 @@
-import { Camera, Plus } from 'lucide-react'
-import { HashRouter, NavLink, Route, Routes, useNavigate, useLocation } from 'react-router'
+import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
+import { HashRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
 import Import from './import'
 import Study from './study'
-import { useState, useEffect } from 'react'
-import { ErrorBoundary } from 'react-error-boundary'
 
 function ErrorFallback({ error, resetErrorBoundary }) {
   console.log('ErrorFallback', error.stack)
+  const navigate = useNavigate()
 
   const copyErrorToClipboard = () => {
     const errorDetails = `
@@ -33,6 +34,16 @@ function ErrorFallback({ error, resetErrorBoundary }) {
       </details>
       <div className="flex gap-2 mt-3">
         <button
+          onClick={() => {
+            navigate('/import')
+            // window.location.reload()
+          }}
+          className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded text-sm"
+        >
+          Back
+        </button>
+
+        <button
           onClick={resetErrorBoundary}
           className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded text-sm"
         >
@@ -43,6 +54,17 @@ function ErrorFallback({ error, resetErrorBoundary }) {
           className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded text-sm"
         >
           Copy error
+        </button>
+
+        <button
+          onClick={() => {
+            localStorage.clear()
+            resetErrorBoundary()
+            navigate('/import')
+          }}
+          className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded text-sm"
+        >
+          Clear all Data
         </button>
       </div>
     </div>
@@ -55,6 +77,12 @@ function AppContent() {
   const location = useLocation()
   const [isDragging, setIsDragging] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+
+  const reset = () => {
+    setStudies([])
+    localStorage.removeItem('studies')
+    localStorage.removeItem('lastUrl')
+  }
 
   useEffect(() => {
     const lastUrl = localStorage.getItem('lastUrl')
@@ -97,7 +125,7 @@ function AppContent() {
       setIsImporting(true)
 
       try {
-        const { id, data, path } = await window.api.importDroppedDirectory(files[0])
+        const { id, data, path } = await window.api.importDroppedDataset(files[0])
         onNewStudy({ id, name: data.name, data, path })
         navigate(`/study/${id}`)
       } finally {
@@ -149,6 +177,11 @@ function AppContent() {
   }, [studies, location, navigate])
 
   const onNewStudy = (study) => {
+    const isValid = study && study.id && study.name && study.data && study.path
+    if (!isValid) {
+      console.error('Invalid study data', study)
+      return
+    }
     const newStudies = [...studies, study]
     setStudies(newStudies)
     localStorage.setItem('studies', JSON.stringify(newStudies))
@@ -183,7 +216,7 @@ function AppContent() {
           textAlign: 'center'
         }}
       >
-        <h2>Drop Camera Trap Directory to Import</h2>
+        <h2>Drop Camera Trap Directory or ZIP File to Import</h2>
       </div>
     </div>
   ) : null

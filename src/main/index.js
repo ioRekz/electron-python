@@ -349,6 +349,148 @@ function registerLocalFileProtocol() {
   })
 }
 
+// Add a shared function to process datasets (used by both select-dataset and import-dropped-dataset)
+async function processDataset(inputPath, id) {
+  let pathToImport = inputPath
+
+  try {
+    // Check if selected path is a file (potential zip) or directory
+    const stats = statSync(inputPath)
+    const isZip = stats.isFile() && inputPath.toLowerCase().endsWith('.zip')
+
+    if (isZip) {
+      log.info(`Processing zip file: ${inputPath}`)
+
+      // Create a directory for extraction in app data
+      const extractPath = join(app.getPath('userData'), id)
+      if (!existsSync(extractPath)) {
+        mkdirSync(extractPath, { recursive: true })
+      }
+
+      // Extract the zip file
+      log.info(`Extracting ${inputPath} to ${extractPath}`)
+      await new Promise((resolve, reject) => {
+        const tarProcess = spawn('tar', ['-xf', inputPath, '-C', extractPath])
+
+        tarProcess.stdout.on('data', (data) => {
+          log.info(`tar output: ${data}`)
+        })
+
+        tarProcess.stderr.on('data', (data) => {
+          log.info(`tar progress: ${data}`)
+        })
+
+        tarProcess.on('error', (err) => {
+          log.error(`Error executing tar command:`, err)
+          reject(err)
+        })
+
+        tarProcess.on('close', (code) => {
+          if (code === 0) {
+            log.info(`Extraction complete to ${extractPath}`)
+            resolve()
+          } else {
+            const err = new Error(`tar process exited with code ${code}`)
+            log.error(err)
+            reject(err)
+          }
+        })
+      })
+
+      // Find the directory containing a datapackage.json file
+      let camtrapDpDirPath = null
+
+      const findCamtrapDpDir = (dir) => {
+        if (camtrapDpDirPath) return // Already found, exit recursion
+
+        try {
+          const files = readdirSync(dir)
+
+          // First check if this directory has datapackage.json
+          if (files.includes('datapackage.json')) {
+            camtrapDpDirPath = dir
+            return
+          }
+
+          // Then check subdirectories
+          for (const file of files) {
+            const fullPath = join(dir, file)
+            if (statSync(fullPath).isDirectory()) {
+              findCamtrapDpDir(fullPath)
+            }
+          }
+        } catch (error) {
+          log.warn(`Error reading directory ${dir}: ${error.message}`)
+        }
+      }
+
+      findCamtrapDpDir(extractPath)
+
+      if (!camtrapDpDirPath) {
+        throw new Error('CamTrap DP directory with datapackage.json not found in extracted archive')
+      }
+
+      log.info(`Found CamTrap DP directory at ${camtrapDpDirPath}`)
+      pathToImport = camtrapDpDirPath
+    } else if (!stats.isDirectory()) {
+      throw new Error('The selected path is neither a directory nor a zip file')
+    }
+
+    // Import the dataset
+    const { data } = await importCamTrapDataset(pathToImport, id)
+
+    // Clean up CSV files and datapackage.json after successful import if it was a zip
+    if (pathToImport !== inputPath) {
+      log.info('Cleaning up CSV files and datapackage.json...')
+
+      const cleanupDirectory = (dir) => {
+        try {
+          const files = readdirSync(dir)
+
+          for (const file of files) {
+            const fullPath = join(dir, file)
+
+            if (statSync(fullPath).isDirectory()) {
+              cleanupDirectory(fullPath)
+            } else if (
+              file.toLowerCase().endsWith('.csv') ||
+              file.toLowerCase() === 'datapackage.json'
+            ) {
+              log.info(`Removing file: ${fullPath}`)
+              unlinkSync(fullPath)
+            }
+          }
+        } catch (error) {
+          log.warn(`Error cleaning up directory ${dir}: ${error.message}`)
+        }
+      }
+
+      cleanupDirectory(pathToImport)
+    }
+
+    return {
+      path: pathToImport,
+      data,
+      id
+    }
+  } catch (error) {
+    log.error('Error processing dataset:', error)
+    // Clean up extracted directory if there was an error
+    if (pathToImport !== inputPath) {
+      try {
+        await new Promise((resolve) => {
+          const rmProcess = spawn('rm', ['-rf', join(app.getPath('userData'), id)])
+          rmProcess.on('close', () => resolve())
+          rmProcess.on('error', () => resolve())
+        })
+      } catch (cleanupError) {
+        log.warn(`Failed to clean up after error: ${cleanupError.message}`)
+      }
+    }
+    throw error
+  }
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -387,23 +529,40 @@ app.whenReady().then(async () => {
     return null
   })
 
-  // Add folder selection handler
-  ipcMain.handle('select-folder', async () => {
-    const result = dialog.showOpenDialogSync({
-      properties: ['openDirectory']
+  // Add dataset selection handler (supports both directories and zip files)
+  ipcMain.handle('select-dataset', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile', 'openDirectory'],
+      filters: [
+        { name: 'Datasets', extensions: ['zip'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
     })
-    if (!result) return null
-    // if (!pythonProcess) {
-    //   startPythonServer()
-    // }
-    const path = result[0]
-    const id = crypto.randomUUID()
-    const { data } = await importCamTrapDataset(path, id)
 
-    return {
-      path,
-      data,
-      id
+    if (!result || result.canceled || result.filePaths.length === 0) return null
+
+    const selectedPath = result.filePaths[0]
+    const id = crypto.randomUUID()
+
+    return await processDataset(selectedPath, id)
+  })
+
+  // Add drag and drop handler (supports both directories and zip files)
+  ipcMain.handle('import-dropped-dataset', async (_, path) => {
+    try {
+      log.info(`Processing dropped item: ${path}`)
+
+      // Validate that the path exists
+      if (!existsSync(path)) {
+        log.warn(`Invalid path: ${path}`)
+        return { error: 'The dropped item does not exist' }
+      }
+
+      const id = crypto.randomUUID()
+      return await processDataset(path, id)
+    } catch (error) {
+      log.error('Error processing dropped dataset:', error)
+      return { error: error.message }
     }
   })
 
@@ -543,31 +702,6 @@ app.whenReady().then(async () => {
       return { data: dailyActivity }
     } catch (error) {
       log.error('Error getting species daily activity data:', error)
-      return { error: error.message }
-    }
-  })
-
-  // Add drag and drop handler
-  ipcMain.handle('import-dropped-directory', async (_, directoryPath) => {
-    try {
-      log.info(`Processing dropped directory: ${directoryPath}`)
-
-      // Validate that the path exists and is a directory
-      if (!existsSync(directoryPath) || !statSync(directoryPath).isDirectory()) {
-        log.warn(`Invalid directory path: ${directoryPath}`)
-        return { error: 'The dropped item is not a valid directory' }
-      }
-
-      const id = crypto.randomUUID()
-      const { data } = await importCamTrapDataset(directoryPath, id)
-
-      return {
-        path: directoryPath,
-        data,
-        id
-      }
-    } catch (error) {
-      log.error('Error processing dropped directory:', error)
       return { error: error.message }
     }
   })

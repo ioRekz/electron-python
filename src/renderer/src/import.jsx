@@ -6,11 +6,12 @@ export default function Import({ onNewStudy }) {
   const [importing, setImporting] = useState(false)
   const [isDemoImporting, setIsDemoImporting] = useState(false)
 
-  const handleClassification = async () => {
+  const handleSelect = async () => {
     setImporting(true)
-    const { data, id } = await window.api.selectFolder()
+    const { data, id, path } = await window.api.selectDataset()
+    console.log('select', path)
     if (!id) return
-    onNewStudy({ id, name: data.name, data })
+    onNewStudy({ id, name: data.name, data, path })
     navigate(`/study/${id}`)
   }
 
@@ -39,7 +40,7 @@ export default function Import({ onNewStudy }) {
           visualsations.
         </p>
         <button
-          onClick={handleClassification}
+          onClick={handleSelect}
           className={`cursor-pointer transition-colors mt-8 flex justify-center flex-row gap-2 items-center border border-gray-200 px-2 h-10 text-sm shadow-sm rounded-md hover:bg-gray-50`}
         >
           {importing ? <span className="animate-pulse">Importing...</span> : 'Select Folder'}

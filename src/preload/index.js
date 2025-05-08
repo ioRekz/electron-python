@@ -10,8 +10,8 @@ const api = {
     console.log('electronAPI', electronAPI)
     return await electronAPI.ipcRenderer.invoke('select-image')
   },
-  selectFolder: async () => {
-    return await electronAPI.ipcRenderer.invoke('select-folder')
+  selectDataset: async () => {
+    return await electronAPI.ipcRenderer.invoke('select-dataset')
   },
   checkModelStatus: async () => {
     return await electronAPI.ipcRenderer.invoke('check-model-status')
@@ -28,9 +28,9 @@ const api = {
   getDeployments: async (studyId) => {
     return await electronAPI.ipcRenderer.invoke('get-deployments', studyId)
   },
-  importDroppedDirectory: async (path) => {
+  importDroppedDataset: async (path) => {
     return await electronAPI.ipcRenderer.invoke(
-      'import-dropped-directory',
+      'import-dropped-dataset',
       webUtils.getPathForFile(path)
     )
   },
