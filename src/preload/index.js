@@ -77,6 +77,9 @@ const api = {
       startDate,
       endDate
     )
+  },
+  selectImagesDirectory: async () => {
+    return await electronAPI.ipcRenderer.invoke('select-images-directory')
   }
 }
 

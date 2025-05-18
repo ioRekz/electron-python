@@ -42,6 +42,8 @@ function SpeciesDistribution({ data, taxonomicData, selectedSpecies, onSpeciesCh
           (name) => name.language === 'eng' || name.language === 'en'
         )
 
+        console.log('EN', englishName, vernacularData.results)
+
         if (englishName) {
           return englishName.vernacularName
         }
@@ -121,9 +123,11 @@ function SpeciesDistribution({ data, taxonomicData, selectedSpecies, onSpeciesCh
         {data.map((species, index) => {
           // Try to get the common name from the taxonomic data first, then from fetched data
           const commonName =
-            scientificToCommonMap[species.scientificName] ||
-            commonNames[species.scientificName] ||
-            'Unknown'
+            scientificToCommonMap[species.scientificName] || commonNames[species.scientificName]
+
+          console.log(scientificToCommonMap, commonNames, species.scientificName)
+
+          console.log(commonName, species.scientificName)
 
           const isSelected = selectedSpecies.some(
             (s) => s.scientificName === species.scientificName
@@ -148,8 +152,8 @@ function SpeciesDistribution({ data, taxonomicData, selectedSpecies, onSpeciesCh
                     }}
                   ></div>
 
-                  <span className="capitalize text-sm">{commonName}</span>
-                  {species.scientificName && (
+                  <span className="capitalize text-sm">{commonName || species.scientificName}</span>
+                  {species.scientificName && commonName !== undefined && (
                     <span className="text-gray-500 text-sm italic ml-2">
                       {species.scientificName}
                     </span>

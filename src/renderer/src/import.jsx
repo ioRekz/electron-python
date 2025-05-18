@@ -5,6 +5,7 @@ export default function Import({ onNewStudy }) {
   let navigate = useNavigate()
   const [importing, setImporting] = useState(false)
   const [isDemoImporting, setIsDemoImporting] = useState(false)
+  const [isImportingImages, setIsImportingImages] = useState(false)
 
   const handleSelect = async () => {
     setImporting(true)
@@ -28,6 +29,24 @@ export default function Import({ onNewStudy }) {
     } catch (error) {
       console.error('Failed to import demo dataset:', error)
       setIsDemoImporting(false)
+    }
+  }
+
+  const handleImportImages = async () => {
+    setIsImportingImages(true)
+    try {
+      const { data, id, path } = await window.api.selectImagesDirectory()
+      if (!id) {
+        setIsImportingImages(false)
+        return
+      }
+      onNewStudy({ id, name: data.name, data, path })
+      navigate(`/study/${id}`)
+      // TODO: Handle the imported images appropriately when this feature is expanded
+      setIsImportingImages(false)
+    } catch (error) {
+      console.error('Failed to import images:', error)
+      setIsImportingImages(false)
     }
   }
 
@@ -66,6 +85,27 @@ export default function Import({ onNewStudy }) {
             'Use Demo Dataset'
           )}
         </button>
+        {/* <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">or</span>
+          </div>
+        </div>
+        <button
+          onClick={handleImportImages}
+          disabled={isImportingImages}
+          className={`cursor-pointer transition-colors flex justify-center flex-row gap-2 items-center border border-gray-200 px-2 h-10 text-sm shadow-sm rounded-md hover:bg-gray-50 ${
+            isImportingImages ? 'opacity-70' : ''
+          }`}
+        >
+          {isImportingImages ? (
+            <span className="animate-pulse">Importing images...</span>
+          ) : (
+            'Import Images Directory'
+          )}
+        </button> */}
       </div>
     </div>
   )

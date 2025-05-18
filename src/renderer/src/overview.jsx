@@ -194,16 +194,14 @@ function SpeciesDistribution({ data, taxonomicData }) {
         {data.map((species, index) => {
           // Try to get the common name from the taxonomic data first, then from fetched data
           const commonName =
-            scientificToCommonMap[species.scientificName] ||
-            commonNames[species.scientificName] ||
-            'Unknown'
+            scientificToCommonMap[species.scientificName] || commonNames[species.scientificName]
 
           return (
             <div key={index} className="">
               <div className="flex justify-between mb-1 items-center">
                 <div>
-                  <span className="capitalize text-sm">{commonName}</span>
-                  {species.scientificName && (
+                  <span className="capitalize text-sm">{commonName || species.scientificName}</span>
+                  {species.scientificName && commonName !== undefined && (
                     <span className="text-gray-500 text-sm italic ml-2">
                       ({species.scientificName})
                     </span>

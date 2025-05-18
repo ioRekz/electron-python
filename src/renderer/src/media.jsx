@@ -220,6 +220,7 @@ function Gallery({ species, dateRange, timeRange }) {
             <img
               src={constructImageUrl(media.filePath)}
               alt={media.fileName || `Media ${media.mediaID}`}
+              data-image={media.filePath}
               className={`object-contain w-full h-auto min-h-20 ${imageErrors[media.mediaID] ? 'hidden' : ''}`}
               onError={() => {
                 setImageErrors((prev) => ({ ...prev, [media.mediaID]: true }))
@@ -341,15 +342,23 @@ export default function Activity({ studyData, studyId }) {
       dateRange[1] === null
     ) {
       const totalPeriods = timeseriesData.length
-      const startIndex = Math.max(totalPeriods - Math.ceil(totalPeriods * 0.3), 0)
+      const startIndex = Math.max(totalPeriods - Math.max(Math.ceil(totalPeriods * 0.3), 2), 0)
       const endIndex = totalPeriods - 1
 
-      setDateRange([
-        new Date(timeseriesData[startIndex].date),
-        new Date(timeseriesData[endIndex].date)
-      ])
+      let startDate = new Date(timeseriesData[startIndex].date)
+      let endDate = new Date(timeseriesData[endIndex].date)
+
+      // Ensure a minimum range of 1 day if dates are the same
+      // if (startDate.getTime() === endDate.getTime()) {
+      //   endDate = new Date(startDate)
+      //   endDate.setDate(endDate.getDate() + 1) // Add one day to end date
+      // }
+
+      setDateRange([startDate, endDate])
     }
   }, [timeseriesData])
+
+  console.log('dateRange', dateRange)
 
   useEffect(() => {
     async function fetchDailyActivityData() {

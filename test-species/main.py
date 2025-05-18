@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pathlib import Path
 import argparse
+from PIL import Image
+import json
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -27,7 +29,7 @@ def get_model():
                     # Uncomment the line below if you want to run your own custom ensembling
                     # routine. And also, implement that routine! :-)
                     # combine_predictions_fn=custom_combine_predictions_fn,
-                    multiprocessing=False,
+                    multiprocessing=True,
                 )
     return _model
 
@@ -65,12 +67,24 @@ def detect_bear():
         print(e)
         return jsonify({'error': str(e)}), 500
 
-def main(port):
-    print(f"Starting flask server on port {port}")
-    app.run(port=port)
+
+def main(path):
+    print(f"Starting flask server with path {path}")
+    # app.run(path=path)
+    print(f"Processing directory: {path}")
+    model = get_model()
+    instances_dict = prepare_instances_dict(folders=[path], country='NLD')
+    predictions_dict = model.predict(
+        instances_dict=instances_dict,
+        progress_bars=True,
+    )
+    for item in predictions_dict['predictions']:
+        print("PREDICTION: " + json.dumps(item))
+    print(json.dumps(predictions_dict['predictions'], indent=2))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, required=True, help='Port to run the server on')
+    parser.add_argument('--path', type=str, default='.', help='Path to the directory to process')
     args = parser.parse_args()
-    main(port=args.port)
+    main(args.path)

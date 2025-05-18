@@ -985,3 +985,281 @@ function processTimeseriesDataFromSql(rawData) {
     }))
     .sort((a, b) => a.date.localeCompare(b.date))
 }
+
+/**
+ * Create and initialize a new database for an image directory
+ * @param {string} dbPath - Path for the new SQLite database
+ * @returns {Promise<sqlite3.Database>} - Database instance
+ */
+export async function createImageDirectoryDatabase(dbPath) {
+  return new Promise((resolve, reject) => {
+    log.info(`Creating new database at: ${dbPath}`)
+
+    // Create/open the database
+    const db = new sqlite3.Database(
+      dbPath,
+      sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE,
+      async (err) => {
+        if (err) {
+          log.error(`Error creating database: ${err.message}`)
+          return reject(err)
+        }
+
+        try {
+          // Enable foreign keys
+          await runQuery(db, 'PRAGMA foreign_keys = ON')
+
+          // Create deployments table
+          await runQuery(
+            db,
+            `
+          CREATE TABLE IF NOT EXISTS deployments (
+            deploymentID TEXT PRIMARY KEY,
+            locationID TEXT,
+            locationName TEXT,
+            deploymentStart TEXT,
+            deploymentEnd TEXT,
+            latitude REAL,
+            longitude REAL
+          )
+        `
+          )
+
+          // Create media table
+          await runQuery(
+            db,
+            `
+          CREATE TABLE IF NOT EXISTS media (
+            mediaID TEXT PRIMARY KEY,
+            deploymentID TEXT,
+            timestamp TEXT,
+            filePath TEXT,
+            fileName TEXT,
+            FOREIGN KEY (deploymentID) REFERENCES deployments (deploymentID)
+          )
+        `
+          )
+
+          // Create observations table (for future predictions)
+          await runQuery(
+            db,
+            `
+          CREATE TABLE IF NOT EXISTS observations (
+            observationID TEXT PRIMARY KEY,
+            mediaID TEXT,
+            deploymentID TEXT,
+            eventID TEXT,
+            eventStart TEXT,
+            scientificName TEXT,
+            confidence REAL,
+            count INTEGER DEFAULT 1,
+            prediction TEXT,
+            FOREIGN KEY (mediaID) REFERENCES media (mediaID),
+            FOREIGN KEY (deploymentID) REFERENCES deployments (deploymentID)
+          )
+        `
+          )
+
+          resolve(db)
+        } catch (error) {
+          log.error(`Error initializing database: ${error.message}`)
+          reject(error)
+        }
+      }
+    )
+  })
+}
+
+/**
+ * Insert deployment data into the database
+ * @param {sqlite3.Database} db - Database instance
+ * @param {Array} deployments - Array of deployment objects
+ * @returns {Promise<void>}
+ */
+export async function insertDeployments(db, deployments) {
+  return new Promise((resolve, reject) => {
+    log.info(`Inserting ${Object.keys(deployments).length} deployments into database`)
+
+    db.run('BEGIN TRANSACTION', async (err) => {
+      if (err) {
+        log.error(`Error starting transaction: ${err.message}`)
+        return reject(err)
+      }
+
+      try {
+        const insertSql = `
+          INSERT INTO deployments (
+            deploymentID, locationID, locationName,
+            deploymentStart, deploymentEnd, latitude, longitude
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `
+
+        for (const depKey of Object.keys(deployments)) {
+          const dep = deployments[depKey]
+          await runQuery(db, insertSql, [
+            dep.deploymentID,
+            dep.locationID,
+            dep.locationName,
+            dep.deploymentStart ? dep.deploymentStart.toISO() : null,
+            dep.deploymentEnd ? dep.deploymentEnd.toISO() : null,
+            dep.latitude,
+            dep.longitude
+          ])
+        }
+
+        db.run('COMMIT', (err) => {
+          if (err) {
+            log.error(`Error committing transaction: ${err.message}`)
+            db.run('ROLLBACK')
+            return reject(err)
+          }
+          log.info(`Successfully inserted ${Object.keys(deployments).length} deployments`)
+          resolve()
+        })
+      } catch (error) {
+        log.error(`Error inserting deployments: ${error.message}`)
+        db.run('ROLLBACK')
+        reject(error)
+      }
+    })
+  })
+}
+
+/**
+ * Insert media data into the database
+ * @param {sqlite3.Database} db - Database instance
+ * @param {Array} media - Array of media objects
+ * @returns {Promise<void>}
+ */
+export async function insertMedia(db, media) {
+  return new Promise((resolve, reject) => {
+    log.info(`Inserting ${Object.keys(media).length} media items into database`)
+
+    db.run('BEGIN TRANSACTION', async (err) => {
+      if (err) {
+        log.error(`Error starting transaction: ${err.message}`)
+        return reject(err)
+      }
+
+      try {
+        const insertSql = `
+          INSERT INTO media (
+            mediaID, deploymentID, timestamp, filePath, fileName
+          ) VALUES (?, ?, ?, ?, ?)
+        `
+
+        let count = 0
+        for (const mediaPath of Object.keys(media)) {
+          const item = media[mediaPath]
+          console.log('ITEM', item)
+          await runQuery(db, insertSql, [
+            item.mediaID,
+            item.deploymentID,
+            item.timestamp ? item.timestamp.toISO() : null,
+            item.filePath,
+            item.fileName
+          ])
+
+          count++
+          if (count % 1000 === 0) {
+            log.info(`Inserted ${count}/${Object.keys(media).length} media items`)
+          }
+        }
+
+        db.run('COMMIT', (err) => {
+          if (err) {
+            log.error(`Error committing transaction: ${err.message}`)
+            db.run('ROLLBACK')
+            return reject(err)
+          }
+          log.info(`Successfully inserted ${count} media items`)
+          resolve()
+        })
+      } catch (error) {
+        log.error(`Error inserting media: ${error.message}`)
+        db.run('ROLLBACK')
+        reject(error)
+      }
+    })
+  })
+}
+
+/**
+ * Insert observations data into the database
+ * @param {sqlite3.Database} db - Database instance
+ * @param {Array} observations - Array of observation objects
+ * @returns {Promise<void>}
+ */
+export async function insertObservations(db, observations) {
+  return new Promise((resolve, reject) => {
+    log.info(`Inserting ${observations.length} observations into database`)
+
+    db.run('BEGIN TRANSACTION', async (err) => {
+      if (err) {
+        log.error(`Error starting transaction: ${err.message}`)
+        return reject(err)
+      }
+
+      try {
+        const insertSql = `
+          INSERT INTO observations (
+            observationID, mediaID, deploymentID, eventID,
+            eventStart, scientificName, confidence, prediction
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `
+
+        let count = 0
+        for (const observation of observations) {
+          await runQuery(db, insertSql, [
+            observation.observationID,
+            observation.mediaID,
+            observation.deploymentID,
+            observation.eventID,
+            observation.eventStart ? observation.eventStart.toISO() : null,
+            observation.scientificName,
+            observation.confidence || null,
+            observation.prediction || null
+          ])
+
+          count++
+          if (count % 1000 === 0) {
+            log.info(`Inserted ${count}/${observations.length} observations`)
+          }
+        }
+
+        db.run('COMMIT', (err) => {
+          if (err) {
+            log.error(`Error committing transaction: ${err.message}`)
+            db.run('ROLLBACK')
+            return reject(err)
+          }
+          log.info(`Successfully inserted ${count} observations`)
+          resolve()
+        })
+      } catch (error) {
+        log.error(`Error inserting observations: ${error.message}`)
+        db.run('ROLLBACK')
+        reject(error)
+      }
+    })
+  })
+}
+
+/**
+ * Run a SQLite query (helper function)
+ * @param {sqlite3.Database} db - Database instance
+ * @param {string} query - SQL query
+ * @param {Array} params - Parameters for the query
+ * @returns {Promise<Object>} - Result of the query
+ */
+function runQuery(db, query, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(query, params, function (err) {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(this)
+      }
+    })
+  })
+}
