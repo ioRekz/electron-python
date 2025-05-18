@@ -68,7 +68,7 @@ jobs:
 
       - name: Install Node.js dependencies
         run: |
-          npm install --force
+          npm install --legacy-peer-deps
 
       - name: Build on MacOS
         env:
