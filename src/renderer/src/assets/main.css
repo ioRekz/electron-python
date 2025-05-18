@@ -182,3 +182,7 @@ body:not(.mac-os) .overflow-y-auto::-webkit-scrollbar-thumb {
   border-radius: 10px;
   background-color: #777;
 }
+
+.break-anywhere {
+  overflow-wrap: anywhere;
+}

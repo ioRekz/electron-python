@@ -267,13 +267,13 @@ function AppContent() {
             >
               <span>Studies</span>
             </NavLink>
-            <ul className="border-l mx-3.5 border-gray-200 flex w-full flex-col gap-1 px-1.5 py-0.5 text-[hsl(var(--sidebar-foreground))]">
+            <ul className="border-l mx-3.5 border-gray-200 flex w-full flex-col gap-2 px-1.5 py-0.5 text-[hsl(var(--sidebar-foreground))]">
               {studies.map((study) => (
                 <li key={study.id}>
                   <NavLink
                     to={`/study/${study.id}`}
                     className={({ isActive }) =>
-                      `min-w-0 flex w-full items-center text-sm hover:bg-gray-100 rounded-md px-2 h-7 ${isActive ? 'font-semibold' : ''}`
+                      `break-anywhere flex w-full items-center text-sm hover:bg-gray-100 rounded-md px-2 ${isActive ? 'font-semibold' : ''}`
                     }
                     onContextMenu={(e) => handleStudyContextMenu(e, study)}
                   >
