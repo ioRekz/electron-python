@@ -49,7 +49,7 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
-  owner: ioRekz
-  repo: electron-python
+  owner: earthtoolsmaker
+  repo: biowatch
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
