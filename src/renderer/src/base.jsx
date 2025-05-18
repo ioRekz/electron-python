@@ -78,12 +78,6 @@ function AppContent() {
   const [isDragging, setIsDragging] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
 
-  const reset = () => {
-    setStudies([])
-    localStorage.removeItem('studies')
-    localStorage.removeItem('lastUrl')
-  }
-
   useEffect(() => {
     const lastUrl = localStorage.getItem('lastUrl')
 
