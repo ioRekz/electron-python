@@ -56,7 +56,7 @@ export default function Import({ onNewStudy }) {
         <h2 className="font-medium">Import</h2>
         <p className="text-sm text-gray-500">
           Select or drop a Camtrap DP folder. After importing, we will generate summary and
-          visualsations.
+          visualisations.
         </p>
         <button
           onClick={handleSelect}
