@@ -24,6 +24,7 @@ export default function Import({ onNewStudy }) {
         setIsDemoImporting(false)
         return
       }
+      console.log('Demo dataset downloaded:', data, id)
       onNewStudy({ id, name: data.name, data })
       navigate(`/study/${id}`)
     } catch (error) {

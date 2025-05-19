@@ -173,8 +173,7 @@ function AppContent() {
   const onNewStudy = (study) => {
     const isValid = study && study.id && study.name && study.data && study.path
     if (!isValid) {
-      console.error('Invalid study data', study)
-      return
+      console.warn('Invalid study data', study)
     }
     const newStudies = [...studies, study]
     setStudies(newStudies)
