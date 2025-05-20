@@ -4,13 +4,17 @@
   <img src="./docs/assets/images/biowatch-logo-small.png" alt="Biowatch Logo" />
 </p>
 
+<p align="center">
+  <a href="https://www.earthtoolsmaker.org/tools/biowatch/">Download</a>
+</p>
+<br/>
+<br/>
+
 Biowatch is a powerful tool for wildlife researchers and conservationists to
 analyze, visualize, and explore [CamtrapDP
 datasets](https://camtrap-dp.tdwg.org/) with ease.
 
 ![Overview](./docs/assets/images/overview-biowatch.gif)
-
-[Download Biowatch](https://www.earthtoolsmaker.org/tools/biowatch/)
 
 ## Key Features
 
