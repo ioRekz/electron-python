@@ -4,8 +4,14 @@
   <img src="./docs/assets/images/biowatch-logo-small.png" alt="Biowatch Logo" />
 </p>
 
+
 <p align="center">
-  <a href="https://www.earthtoolsmaker.org/tools/biowatch/"> Download <img alt="GitHub package.json version" src="https://img.shields.io/github/package-json/v/earthtoolsmaker/biowatch" /> </a> | <a href="https://www.earthtoolsmaker.org/donate/">Support Us</a> | <a href="https://www.earthtoolsmaker.org/contact/">Contact Us</a>
+    <img alt="GitHub package.json version" src="https://img.shields.io/github/package-json/v/earthtoolsmaker/biowatch" />
+</p>
+<br/>
+
+<p align="center">
+  <a href="https://www.earthtoolsmaker.org/tools/biowatch/"> Download</a> | <a href="https://www.earthtoolsmaker.org/donate/">Support Us</a> | <a href="https://www.earthtoolsmaker.org/contact/">Contact Us</a>
 </p>
 <br/>
 <br/>
