@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.earthtoolsmaker.org/tools/biowatch/">Download</a>
+  <a href="https://www.earthtoolsmaker.org/tools/biowatch/">Download</a> | <a href="https://www.earthtoolsmaker.org/donate/">Support Us</a> | <a href="https://www.earthtoolsmaker.org/contact/">Contact Us</a>
 </p>
 <br/>
 <br/>
