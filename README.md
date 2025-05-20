@@ -1,5 +1,9 @@
 # Biowatch
 
+<p align="center">
+  <img src="./docs/assets/images/biowatch-logo.png" alt="Biowatch Logo" />
+</p>
+
 Biowatch is a powerful tool for wildlife researchers and conservationists to
 analyze, visualize, and explore [CamtrapDP
 datasets](https://camtrap-dp.tdwg.org/) with ease.
