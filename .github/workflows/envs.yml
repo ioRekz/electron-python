@@ -27,8 +27,8 @@ jobs:
       - name: Install Python dependencies
         shell: bash -l {0}
         run: |
-          conda run pip install flask flask-cors
-          conda run pip install speciesnet --use-pep517
+          conda run pip install uv
+          conda run uv sync
           conda list
 
       - name: Compress conda environment
