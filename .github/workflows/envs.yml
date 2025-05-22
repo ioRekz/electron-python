@@ -16,7 +16,7 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-22.04]
     steps:
       - name: Checkout repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Run step when directory changes
         run: echo "This workflow runs only when files in 'my-directory' are modified."
@@ -44,7 +44,7 @@ jobs:
           CONDA_BASE=$(conda info --base)
           CONDA_ENV_PATH=$CONDA_BASE/envs/species-env
 
-          tar -czf dist/species-env-${{ runner.os }}.tar.gz -C $CONDA_BASE/envs species-env
+          tar -czf dist/species-env-${{ runner.os }}-with-uv.tar.gz -C $CONDA_BASE/envs species-env
 
       - name: Upload to Cloudflare R2
         uses: shallwefootball/s3-upload-action@master
