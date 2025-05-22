@@ -117,12 +117,6 @@ class SpeciesNetLitAPI(ls.LitAPI):
                 batch_instances_dict, batch_predictions_dict
             )
 
-    # def predict(self, instances_dict, context):
-    #     del context  # Unused.
-    #     predictions_dict = self.model.predict(instances_dict=instances_dict)
-    #     assert predictions_dict is not None
-    #     return self._propagate_extra_fields(instances_dict, predictions_dict)
-
     def encode_response(self, output, context):
         del context  # Unused.
         for out in output:
