@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'test-species/**'
+      - arthur/conda-env-use-uv
+    # paths:
+    #   - 'test-species/**'
 
 jobs:
   upload_env:
