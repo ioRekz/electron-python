@@ -32,7 +32,9 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install the project
-        run: uv sync --all-extras --dev
+        run: |
+          cd ./test-species
+          uv sync --all-extras --dev
 
       - name: Generate new requirements.txt
         run: |
