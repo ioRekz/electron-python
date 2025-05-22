@@ -38,11 +38,13 @@ jobs:
 
       - name: Generate new requirements.txt
         run: |
+          cd ./test-species
           uv export --format requirements-txt > requirements.txt
 
       - name: Install Python dependencies in Conda environment
         shell: bash -l {0}
         run: |
+          cd ./test-species
           conda run pip install -r requirements.txt
           conda list
 
