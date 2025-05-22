@@ -1,4 +1,4 @@
-## SpeciesNet Server
+# SpeciesNet Server
 
 Start the server with default options:
 
