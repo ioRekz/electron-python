@@ -28,7 +28,9 @@ jobs:
         shell: bash -l {0}
         run: |
           conda run pip install uv
+          cd ./test-species
           conda run uv sync
+          conda run uv tree
           conda list
 
       - name: Compress conda environment
