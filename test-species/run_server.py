@@ -1,3 +1,7 @@
+"""
+CLI script to run SpeciesNet as a LitServer.
+"""
+
 from typing import Optional
 
 import litserve as ls
@@ -65,15 +69,15 @@ class SpeciesNetLitAPI(ls.LitAPI):
         """Initializes the SpeciesNet API server.
 
         Args:
-            model_name:
-                String value identifying the model to be loaded. It can be a Kaggle
-                identifier (starting with `kaggle:`), a HuggingFace identifier (starting
-                with `hf:`) or a local folder to load the model from.
-            geofence:
-                Whether to enable geofencing or not. Defaults to `True`.
-            extra_fields:
-                 Comma-separated list of extra fields to propagate from request to
-                 response.
+                model_name:
+                        String value identifying the model to be loaded. It can be a Kaggle
+                        identifier (starting with `kaggle:`), a HuggingFace identifier (starting
+                        with `hf:`) or a local folder to load the model from.
+                geofence:
+                        Whether to enable geofencing or not. Defaults to `True`.
+                extra_fields:
+                          Comma-separated list of extra fields to propagate from request to
+                          response.
         """
         super().__init__()
         self.model_name = model_name
@@ -84,8 +88,7 @@ class SpeciesNetLitAPI(ls.LitAPI):
         del device  # Unused.
         self.model = SpeciesNet(self.model_name, geofence=self.geofence)
 
-    def decode_request(self, request, context):
-        del context  # Unused.
+    def decode_request(self, request, **kwargs):
         for instance in request["instances"]:
             filepath = instance["filepath"]
             if not file_exists(filepath):
@@ -93,7 +96,9 @@ class SpeciesNetLitAPI(ls.LitAPI):
         return request
 
     def _propagate_extra_fields(
-        self, instances_dict: dict, predictions_dict: dict
+        self,
+        instances_dict: dict,
+        predictions_dict: dict,
     ) -> dict:
         predictions = predictions_dict["predictions"]
         new_predictions = {p["filepath"]: p for p in predictions}
@@ -103,22 +108,20 @@ class SpeciesNetLitAPI(ls.LitAPI):
                     new_predictions[instance["filepath"]][field] = instance[field]
         return {"predictions": list(new_predictions.values())}
 
-    def predict(self, instances_dict, context):
-        del context  # Unused.
+    def predict(self, instances_dict, **kwargs):
 
         for instance in instances_dict["instances"]:
             filepath = instance["filepath"]
-            batch_instances_dict = {"instances": [{"filepath": filepath}]}
-            batch_predictions_dict = self.model.predict(
-                instances_dict=batch_instances_dict
+            single_instances_dict = {"instances": [{"filepath": filepath}]}
+            single_predictions_dict = self.model.predict(
+                instances_dict=single_instances_dict
             )
-            assert batch_predictions_dict is not None
+            assert single_predictions_dict is not None
             yield self._propagate_extra_fields(
-                batch_instances_dict, batch_predictions_dict
+                single_instances_dict, single_predictions_dict
             )
 
-    def encode_response(self, output, context):
-        del context  # Unused.
+    def encode_response(self, output, **kwargs):
         for out in output:
             yield {"output": out}
 
@@ -136,6 +139,7 @@ def main(argv: list[str]) -> None:
         accelerator="auto",
         devices="auto",
         workers_per_device=_WORKERS_PER_DEVICE.value,
+        model_metadata={"name": _MODEL.value, "type": "speciesnet"},
         timeout=_TIMEOUT.value,
         api_path=_API_PATH.value,
         stream=True,
