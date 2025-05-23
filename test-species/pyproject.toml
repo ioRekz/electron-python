@@ -1,20 +1,13 @@
 [project]
 name = "test-species"
 version = "0.1.0"
-description = "Add your description here"
+description = "speciesNet running as a LitServer"
 readme = "README.md"
 requires-python = ">=3.9,<3.12"
 dependencies = [
     "speciesnet>=4.0.1",
     "numpy<2.0.0", # Pin NumPy to version 1.x
-    "flask>=3.1.0",
-    "flask-cors>=5.0.1",
     "fastapi>=0.115.12",
     "litserve>=0.2.10",
     "python-multipart>=0.0.20",
-]
-
-[dependency-groups]
-dev = [
-    "pyinstaller>=6.12.0",
 ]
