@@ -20,6 +20,14 @@ run_server.py \
   --geofence true
 ```
 
+Load the server from a folder:
+
+```
+run_server.py \
+  --port 8000 \
+  --model "v4.0.1a/"
+```
+
 A Swagger API documentation is served at localhost:${port}/docs
 
 health:
