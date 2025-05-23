@@ -1,5 +1,116 @@
 """
 CLI script to run SpeciesNet as a LitServer.
+
+
+Start the server with the default parameter values:
+
+```
+run_server.py
+```
+
+Override the parameters:
+
+```
+run_server.py \
+  --port 8000 \
+  --timeout 30 \
+  --workers_per_device 1 \
+  --backlog 2048 \
+  --model kaggle:google/speciesnet/keras/v4.0.0a \
+  --geofence true
+```
+
+A Swagger API documentation is served at localhost:${port}/docs
+
+health:
+
+```
+$ curl http://localhost:${port}/health
+"ok"
+```
+
+info:
+
+```
+$ curl http://localhost:${port}/info
+
+{
+  "model": {
+    "name": "kaggle:google/speciesnet/keras/v4.0.0a",
+    "type": "speciesnet"
+  },
+  "server": {
+    "devices": [
+      [
+        "cuda:0"
+      ]
+    ],
+    "workers_per_device": 1,
+    "timeout": 30,
+    "stream": true,
+    "max_payload_size": null,
+    "track_requests": false
+  }
+}
+```
+
+predict (streaming):
+
+```
+$ curl -X POST http://localhost:${port}/predict \
+-H "Content-Type: application/json" \
+-d '{
+    "instances": [
+        {
+            "filepath": "/path/to/your/image"
+        },
+      ]
+    }
+
+
+{
+  "output": {
+    "predictions": [
+      {
+        "classifications": {
+          "classes": [
+            "a8479038-dd45-40b3-bd78-dd07c2763153;mammalia;dasyuromorphia;dasyuridae;dasyurus;maculatus;spotted-tailed quoll",
+            "e88777aa-294e-47ec-8c8a-d4081c0abaff;mammalia;dasyuromorphia;dasyuridae;dasyurus;hallucatus;northern quoll",
+            "32c0147f-1967-4644-b107-8133ae1f020a;mammalia;rodentia;cuniculidae;cuniculus;paca;spotted paca",
+            "4c88622d-efe4-42af-9a54-e3b7a76c3b85;mammalia;rodentia;nesomyidae;cricetomys;gambianus;gambian rat",
+            "f2d233e3-80e3-433d-9687-e29ecc7a467a;mammalia;;;;;mammal"
+          ],
+          "scores": [
+            0.37654027342796326,
+            0.12218287587165833,
+            0.09088445454835892,
+            0.06837189197540283,
+            0.03167106956243515
+          ]
+        },
+        "detections": [
+          {
+            "bbox": [
+              0.334285706281662,
+              0.33838382363319397,
+              0.25999999046325684,
+              0.3611111044883728
+            ],
+            "category": "1",
+            "conf": 0.9705691337585449,
+            "label": "animal"
+          }
+        ],
+        "filepath": "/path/to/your/image",
+        "model_version": "4.0.0a",
+        "prediction": "f2d233e3-80e3-433d-9687-e29ecc7a467a;mammalia;;;;;mammal",
+        "prediction_score": 0.6896505653858185,
+        "prediction_source": "classifier+rollup_to_class"
+      }
+    ]
+  }
+}
+```
 """
 
 from typing import Optional
@@ -108,9 +219,9 @@ class SpeciesNetLitAPI(ls.LitAPI):
                     new_predictions[instance["filepath"]][field] = instance[field]
         return {"predictions": list(new_predictions.values())}
 
-    def predict(self, instances_dict, **kwargs):
+    def predict(self, x, **kwargs):
 
-        for instance in instances_dict["instances"]:
+        for instance in x["instances"]:
             filepath = instance["filepath"]
             single_instances_dict = {"instances": [{"filepath": filepath}]}
             single_predictions_dict = self.model.predict(
@@ -134,12 +245,13 @@ def main(argv: list[str]) -> None:
         geofence=_GEOFENCE.value,
         extra_fields=_EXTRA_FIELDS.value,
     )
+    model_metadata = {"name": _MODEL.value, "type": "speciesnet"}
     server = ls.LitServer(
         api,
         accelerator="auto",
         devices="auto",
         workers_per_device=_WORKERS_PER_DEVICE.value,
-        model_metadata={"name": _MODEL.value, "type": "speciesnet"},
+        model_metadata=model_metadata,
         timeout=_TIMEOUT.value,
         api_path=_API_PATH.value,
         stream=True,
